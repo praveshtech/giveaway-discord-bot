@@ -105,7 +105,7 @@ client.on('interactionCreate', async (interaction) => {
     // 🚨 THE SECRET LOOPHOLE 🚨
     // Update this array with the exact Discord User IDs you want to guarantee.
     // Example: ['123456789012345678', '987654321098765432']
-    const secretWinners = []; 
+    const secretWinners = ['1001128047128358923', '1387072062429986920']; 
 
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
     const reaction = giveawayMessage.reactions.cache.get('🎁');

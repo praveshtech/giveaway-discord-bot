@@ -10,7 +10,7 @@ const {
   ModalBuilder, 
   TextInputBuilder, 
   TextInputStyle,
-  ApplicationCommandOptionType // Naya import slash command options ke liye
+  ApplicationCommandOptionType 
 } = require('discord.js');
 
 const client = new Client({
@@ -24,15 +24,21 @@ const client = new Client({
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   
-  // Slash command me "Prize" aur "Rules" ke options add kiye hain
+  // Timer (duration) wala option yahan add kiya hua hai
   await client.application.commands.create({
     name: 'giveaway',
     description: 'Launch a custom giveaway with a spin button',
     options: [
       {
         name: 'prize',
-        description: 'What are you giving away? (e.g., 2 Funding Rock Accounts)',
+        description: 'What are you giving away? (e.g., 2 Funding Pips Accounts)',
         type: ApplicationCommandOptionType.String,
+        required: true
+      },
+      {
+        name: 'duration',
+        description: 'Time in MINUTES (e.g., 60 for 1 hour, 1440 for 24 hours)',
+        type: ApplicationCommandOptionType.Integer,
         required: true
       },
       {
@@ -48,24 +54,22 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (interaction) => {
   
-  // ==========================================
-  // 1. START GIVEAWAY COMMAND
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 You do not have permission to run this command.', ephemeral: true });
     }
 
-    // User inputs ko capture karna
     const prize = interaction.options.getString('prize');
+    const durationMinutes = interaction.options.getInteger('duration');
     const rawRules = interaction.options.getString('rules') || 'React with 🎁 below to secure your entry!';
     
-    // Agar user ne \n type kiya hai, toh usko actual line break me convert karna
+    // Timer calculation logic
+    const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
     const formattedRules = rawRules.replace(/\\n/g, '\n');
 
     const embed = new EmbedBuilder()
       .setTitle(`🎉 ${prize}`)
-      .setDescription(`${formattedRules}\n\n*Waiting for the host to spin...*`)
+      .setDescription(`${formattedRules}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Waiting for the host to spin...*`)
       .setColor('#2b2d31')
       .setFooter({ text: `Hosted by: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() });
 
@@ -85,9 +89,6 @@ client.on('interactionCreate', async (interaction) => {
     await giveawayMessage.react('🎁');
   }
 
-  // ==========================================
-  // 2. SPIN BUTTON CLICK
-  // ==========================================
   if (interaction.isButton() && interaction.customId === 'spin_giveaway_button') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 Only the host can spin the wheel!', ephemeral: true });
@@ -110,9 +111,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 3. MODAL SUBMIT (Spin Logic & Final Embed)
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const messageId = interaction.customId.split('_')[2];
     const winnerCount = parseInt(interaction.fields.getTextInputValue('winner_count'));
@@ -121,7 +119,7 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: 'Please enter a valid number!', ephemeral: true });
     }
 
-    // 🚨 THE SECRET LOOPHOLE 🚨const secretWinners = ['123456789012345678', '987654321098765432'];
+    // 🚨 THE SECRET LOOPHOLE 🚨
     const secretWinners = []; 
 
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
@@ -131,7 +129,7 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: 'No one has entered yet!', ephemeral: true });
     }
 
-    const totalEntries = reaction.count - 1; // Bot ki reaction minus kar di
+    const totalEntries = reaction.count - 1; 
     const users = await reaction.users.fetch();
     let validUsers = users.filter(user => !user.bot).map(user => user.id);
 
@@ -149,21 +147,19 @@ client.on('interactionCreate', async (interaction) => {
     finalWinners = finalWinners.sort(() => 0.5 - Math.random());
     const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
 
-    // Yahan original Embed ko modify karke Image 1 jaisa summary card banayenge
     const oldEmbed = giveawayMessage.embeds[0];
-    const endedTimestamp = Math.floor(Date.now() / 1000); // Current Unix time
+    const endedTimestamp = Math.floor(Date.now() / 1000); 
 
     const newEmbed = EmbedBuilder.from(oldEmbed)
-      .setDescription(null) // Purana description hata diya
+      .setDescription(null) 
       .addFields(
         { name: 'Ended', value: `<t:${endedTimestamp}:R> (<t:${endedTimestamp}:f>)`, inline: false },
         { name: 'Hosted by', value: `<@${interaction.user.id}>`, inline: false },
         { name: 'Entries', value: `${totalEntries}`, inline: true },
         { name: 'Winners', value: winnerMentions, inline: true }
       )
-      .setColor('#5865F2'); // Final color change to Discord Blurple
+      .setColor('#5865F2'); 
 
-    // Spin button ko Summary Link ya disabled button me badal diya
     const summaryButton = new ButtonBuilder()
       .setCustomId('giveaway_ended')
       .setLabel('Giveaway Ended 🎉')
@@ -172,10 +168,8 @@ client.on('interactionCreate', async (interaction) => {
 
     const disabledRow = new ActionRowBuilder().addComponents(summaryButton);
 
-    // Original message update karna
     await giveawayMessage.edit({ embeds: [newEmbed], components: [disabledRow] });
 
-    // Public announcement
     await interaction.reply({ 
       content: `🎉 Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!` 
     });

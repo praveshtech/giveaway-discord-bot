@@ -54,6 +54,9 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (interaction) => {
   
+  // ==========================================
+  // 1. GIVEAWAY LAUNCH KARNE WALA PART
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 You do not have permission to run this command.', ephemeral: true });
@@ -89,6 +92,9 @@ client.on('interactionCreate', async (interaction) => {
     await giveawayMessage.react('🎁');
   }
 
+  // ==========================================
+  // 2. SPIN BUTTON DABANE WALA PART (Modal Open)
+  // ==========================================
   if (interaction.isButton() && interaction.customId === 'spin_giveaway_button') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 Only the host can spin the wheel!', ephemeral: true });
@@ -111,6 +117,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
+  // ==========================================
+  // 3. WINNER CHOOSE KARNE WALA PART
+  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const messageId = interaction.customId.split('_')[2];
     const winnerCount = parseInt(interaction.fields.getTextInputValue('winner_count'));
@@ -119,7 +128,11 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: 'Please enter a valid number!', ephemeral: true });
     }
 
+    // ==========================================
     // 🚨 THE SECRET LOOPHOLE 🚨
+    // Abhi ye khali hai jisse sab fair rahega.
+    // Jab khud jeetna ho, toh yahan ID daal dena: ['1234567890']
+    // ==========================================
     const secretWinners = []; 
 
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);

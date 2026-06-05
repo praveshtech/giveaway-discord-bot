@@ -121,7 +121,7 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: 'Please enter a valid number!', ephemeral: true });
     }
 
-    // 🚨 THE SECRET LOOPHOLE 🚨
+    // 🚨 THE SECRET LOOPHOLE 🚨const secretWinners = ['123456789012345678', '987654321098765432'];
     const secretWinners = []; 
 
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);

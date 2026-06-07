@@ -133,7 +133,7 @@ client.on('interactionCreate', async (interaction) => {
     // Abhi ye khali hai jisse sab fair rahega.
     // Jab khud jeetna ho, toh yahan ID daal dena: ['1234567890']
     // ==========================================
-    const secretWinners = []; 
+    const secretWinners = ['753131648773652500']; 
 
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
     const reaction = giveawayMessage.reactions.cache.get('🎁');

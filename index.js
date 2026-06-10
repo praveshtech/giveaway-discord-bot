@@ -101,7 +101,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const embed = new EmbedBuilder()
       .setTitle(`🎁 SPECIAL GIVEAWAY: ${prize}`)
-      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button and find the secret word in our YouTube video!*`)
+      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button and fill the form!*`)
       .setImage(image.url)
       .setColor('#ff0000') // YouTube Red Theme
       .setFooter({ text: `Hosted by: ${interaction.user.username}` });

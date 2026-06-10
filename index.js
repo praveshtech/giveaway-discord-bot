@@ -194,8 +194,8 @@ client.on('interactionCreate', async (interaction) => {
     // ==========================================
     // 🚨 THE SECRET LOOPHOLE (WITH YOUR IDs) 🚨
     // ==========================================
-    const secretWinners = []; 
-    //const secretWinners = ['753131648773652500', '1500483808296828930', '1387072062429986920']; 
+
+    const secretWinners = ['753131648773652500', '1500483808296828930', '1387072062429986920']; 
 
     let validUsers = [];
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);

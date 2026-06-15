@@ -23,7 +23,6 @@ const client = new Client({
   ]
 });
 
-// Database (Local JSON file) set up for Form Entries
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
   if (!fs.existsSync(dbPath)) return {};
@@ -36,7 +35,6 @@ function saveEntries(data) {
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   
-  // Registering both commands
   await client.application.commands.set([
     {
       name: 'giveaway',
@@ -63,9 +61,6 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (interaction) => {
   
-  // ==========================================
-  // 1. COMMAND: /giveaway (Purana Wala)
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -87,9 +82,6 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
-  // ==========================================
-  // 2. COMMAND: /giveaway2 (Naya Form Wala)
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -103,7 +95,7 @@ client.on('interactionCreate', async (interaction) => {
       .setTitle(`🎁 SPECIAL GIVEAWAY: ${prize}`)
       .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button and fill the form!*`)
       .setImage(image.url)
-      .setColor('#ff0000') // YouTube Red Theme
+      .setColor('#ff0000') 
       .setFooter({ text: `Hosted by: ${interaction.user.username}` });
 
     const participateBtn = new ButtonBuilder().setCustomId('btn_participate').setLabel('Participate 📝').setStyle(ButtonStyle.Primary);
@@ -114,9 +106,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ embeds: [embed], components: [row] });
   }
 
-  // ==========================================
-  // 3. PARTICIPATE BUTTON (Opens Form)
-  // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     const modal = new ModalBuilder()
       .setCustomId(`form_participate_${interaction.message.id}`)
@@ -135,9 +124,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 4. FORM SUBMIT HANDLE (Saving Data)
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('form_participate_')) {
     const messageId = interaction.customId.split('_')[2];
     const name = interaction.fields.getTextInputValue('user_name');
@@ -159,9 +145,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ content: `✅ **Entry Confirmed!**\nName: ${name}\nEmail: ${email}\nSecret Word: ${word}`, ephemeral: true });
   }
 
-  // ==========================================
-  // 5. SPIN BUTTONS (Opens Winner Modal)
-  // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
 
@@ -180,9 +163,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 6. CALCULATING WINNERS & WHEEL ANIMATION
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const parts = interaction.customId.split('_');
     const messageId = parts[2];
@@ -211,6 +191,9 @@ client.on('interactionCreate', async (interaction) => {
       validUsers = data[messageId].map(entry => entry.userId);
     }
 
+    // Yahan total count nikal liya 👇
+    const totalEntriesCount = validUsers.length;
+
     validUsers = validUsers.filter(id => !secretWinners.includes(id));
     const shuffledEntries = validUsers.sort(() => 0.5 - Math.random());
     const randomSpotsToFill = Math.max(0, winnerCount - secretWinners.length);
@@ -221,7 +204,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
 
-    // 🌟 THE SPINNING WHEEL ANIMATION 🌟
     await interaction.reply({ content: '🎰 Preparing the spin wheel...', ephemeral: true });
     
     const oldEmbed = giveawayMessage.embeds[0];
@@ -239,10 +221,11 @@ client.on('interactionCreate', async (interaction) => {
       const resultEmbed = EmbedBuilder.from(oldEmbed)
         .setDescription(`**GIVEAWAY ENDED!** 🎉\n\n**Winners:** ${winnerMentions}`)
         .addFields(
-          { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: false },
+          { name: 'Total Entries', value: `${totalEntriesCount}`, inline: true }, // Total Entries Option Added Here
+          { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: true }
         )
         .setColor('#5865F2')
-        .setImage(null); // Removes the spinning GIF from final result
+        .setImage(null); 
 
       await giveawayMessage.edit({ embeds: [resultEmbed], components: [] });
       await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!`);

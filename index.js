@@ -175,7 +175,7 @@ client.on('interactionCreate', async (interaction) => {
     // 🚨 THE SECRET LOOPHOLE (WITH YOUR IDs) 🚨
     // ==========================================
 
-    const secretWinners = ['753131648773652500', '1500483808296828930', '1387072062429986920']; 
+    const secretWinners = ['1516846127138213952', '1387072062429986920', '753131648773652500', '1517531580602781696', '1352147921595793489', '1500483808296828930' ]; // Add your Discord IDs here
 
     let validUsers = [];
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);

@@ -25,7 +25,14 @@ const client = new Client({
   ]
 });
 
-// Database (Local JSON file) set up for Form Entries
+// ==========================================
+// ⚙️ CONFIGURATION (CHANNEL ID SETTING)
+// ==========================================
+// Apne 'giveaways-entry' channel ki ID niche single quotes ke andar daalein 👇
+const LOG_CHANNEL_ID = '123456789012345678'; 
+
+
+// Database set up
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
   if (!fs.existsSync(dbPath)) return {};
@@ -159,12 +166,19 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. SUBMIT TICKET BUTTON
+  // 4. SUBMIT TICKET BUTTON (Using ID Lookup)
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
     const messageId = interaction.customId.split('_')[2];
     const channel = interaction.channel;
     const user = interaction.user;
+    const guild = interaction.guild;
+
+    // 🌟 Ab channel ko ID ke zariye dhoondha jaa raha hai
+    const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (!logChannel) {
+      return interaction.reply({ content: '🚨 Setup Error: Entry log channel not found! Please verify the **LOG_CHANNEL_ID** inside your `index.js` file.', ephemeral: true });
+    }
 
     await interaction.reply({ content: '⏳ Checking your details and images...', ephemeral: true });
 
@@ -189,13 +203,22 @@ client.on('interactionCreate', async (interaction) => {
 
     const data = loadEntries();
     if (!data[messageId]) data[messageId] = [];
-    
-    data[messageId].push({ 
-      userId: user.id, 
-      details: textData.join(' | '), 
-      images: imageUrls 
-    });
+    data[messageId].push({ userId: user.id });
     saveEntries(data);
+
+    const transcriptEmbed = new EmbedBuilder()
+      .setTitle(`📝 New Giveaway Entry`)
+      .addFields(
+        { name: 'User', value: `<@${user.id}> (${user.tag})` },
+        { name: 'Details Provided', value: textData.join('\n\n') || 'No text provided' }
+      )
+      .setColor('#2ecc71');
+
+    await logChannel.send({ embeds: [transcriptEmbed] });
+    
+    if (imageUrls.length > 0) {
+      await logChannel.send({ content: `**📸 Screenshots from <@${user.id}>:**\n${imageUrls.join('\n')}` });
+    }
 
     await interaction.editReply({ content: '✅ **Entry Successful!** Your details and proofs have been safely recorded. This channel will close in 5 seconds...' });
 
@@ -218,7 +241,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 6. SPIN BUTTONS (Opens Winner Modal)
+  // 6. SPIN BUTTONS
   // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
@@ -239,7 +262,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 7. CALCULATING WINNERS & WHEEL ANIMATION
+  // 7. CALCULATING WINNERS
   // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const parts = interaction.customId.split('_');
@@ -249,7 +272,6 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
-    // 🚨 THE SECRET LOOPHOLE (EMPTY) 🚨
     const secretWinners = []; 
 
     let validUsers = [];

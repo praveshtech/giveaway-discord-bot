@@ -49,15 +49,13 @@ function saveEntries(data) {
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     
-    // 🌟 DYNAMIC HEIGHT LOGIC: 
     // Basic details ke liye 400 height + Har photo ke liye 550 extra height
     const calculatedHeight = 400 + (imageUrls.length * 550);
-    const docHeight = Math.max(calculatedHeight, 792); // Kam se kam A4 size rahega
+    const docHeight = Math.max(calculatedHeight, 792); 
 
-    // Ek hi lamba page banega bina kisi break ke
     const doc = new PDFDocument({ 
       margin: 40, 
-      size: [612, docHeight] // Width: 612, Height: Dynamic!
+      size: [612, docHeight] 
     });
     
     let buffers = [];
@@ -95,7 +93,6 @@ function generatePDFTranscript(user, textData, imageUrls) {
         doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
         doc.moveDown(0.5);
         
-        // Image perfectly limit size ke sath yahi chipkegi, bina naya page add kiye
         doc.image(imgBuffer, { fit: [450, 500], align: 'center' });
         doc.moveDown(2);
       } catch (err) {
@@ -136,7 +133,7 @@ client.once('ready', async () => {
 });
 
 // ==========================================
-// 🌟 SMART IMAGE DETECTION LOGIC (Auto-Enable Button)
+// 🌟 SMART IMAGE DETECTION LOGIC
 // ==========================================
 client.on('messageCreate', async (message) => {
   if (!message.channel.name.startsWith('entry-') || message.author.bot) return;
@@ -306,6 +303,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ embeds: [embed], components: [row] });
   }
 
+  // ==========================================
+  // 6. FINAL SUBMIT BUTTON (Generates PDF + Sends DM)
+  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
     const channel = interaction.channel;
@@ -359,6 +359,19 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       await interaction.editReply({ content: '✅ **Entry Successful!** Your PDF transcript has been securely recorded. This channel will close in 5 seconds...' });
+
+      // 🌟 DM BHEJNE KA LOGIC 🌟
+      try {
+        const dmEmbed = new EmbedBuilder()
+          .setTitle('🎉 Giveaway Entry Confirmed!')
+          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully verified** and your proofs have been securely recorded in our system.\n\nKeep an eye on the **Night Trader** server for the winner announcement. Best of luck! 🍀`)
+          .setColor('#2ecc71')
+          .setFooter({ text: 'Night Trader Community' });
+
+        await user.send({ embeds: [dmEmbed] });
+      } catch (dmError) {
+        console.log(`Could not send DM to ${user.tag}. Unhone shayad DMs off kiye hue hain.`);
+      }
 
       setTimeout(() => {
         channel.delete().catch(() => {});

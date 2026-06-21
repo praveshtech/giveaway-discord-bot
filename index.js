@@ -44,11 +44,22 @@ function saveEntries(data) {
 }
 
 // ==========================================
-// 🌟 PDF Generator Function (Fixed Symbols & Image Cut)
+// 🌟 PDF Generator Function (SINGLE CONTINUOUS PAGE FIX)
 // ==========================================
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
-    const doc = new PDFDocument({ margin: 40 });
+    
+    // 🌟 DYNAMIC HEIGHT LOGIC: 
+    // Basic details ke liye 400 height + Har photo ke liye 550 extra height
+    const calculatedHeight = 400 + (imageUrls.length * 550);
+    const docHeight = Math.max(calculatedHeight, 792); // Kam se kam A4 size rahega
+
+    // Ek hi lamba page banega bina kisi break ke
+    const doc = new PDFDocument({ 
+      margin: 40, 
+      size: [612, docHeight] // Width: 612, Height: Dynamic!
+    });
+    
     let buffers = [];
     
     doc.on('data', buffers.push.bind(buffers));
@@ -56,29 +67,23 @@ function generatePDFTranscript(user, textData, imageUrls) {
       resolve(Buffer.concat(buffers));
     });
 
-    // Helper: Emojis ko hatane ke liye (Taki kachra symbols na aayein)
     const removeEmojis = (str) => str.replace(/[^\x00-\x7F]/g, "").trim();
 
-    // Header Title (Clean)
     doc.fontSize(20).fillColor('#111111').text('Giveaway Entry Transcript', { align: 'center', underline: true });
     doc.moveDown(1.5);
 
-    // User Profile Data
     doc.fontSize(12).fillColor('#333333').text(`Discord User: ${removeEmojis(user.tag)}`);
     doc.text(`User ID: ${user.id}`);
     doc.text(`Submitted Date: ${new Date().toLocaleString()}`);
     doc.moveDown(2);
 
-    // Form Text Details
     doc.fontSize(14).fillColor('#007bff').text('Provided Details:', { underline: true });
     doc.moveDown(0.5);
 
-    // Emojis hata kar clean details dalna
     const cleanTextData = textData.map(line => removeEmojis(line));
     doc.fontSize(12).fillColor('#111111').text(cleanTextData.join('\n\n'));
     doc.moveDown(2);
 
-    // Screenshots Header
     doc.fontSize(14).fillColor('#007bff').text('Uploaded Proofs (Screenshots):', { underline: true });
     doc.moveDown(1);
 
@@ -89,8 +94,9 @@ function generatePDFTranscript(user, textData, imageUrls) {
         
         doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
         doc.moveDown(0.5);
-        // Image fit ratio thoda chota kiya taaki cut na ho
-        doc.image(imgBuffer, { fit: [350, 250], align: 'center' });
+        
+        // Image perfectly limit size ke sath yahi chipkegi, bina naya page add kiye
+        doc.image(imgBuffer, { fit: [450, 500], align: 'center' });
         doc.moveDown(2);
       } catch (err) {
         doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically]`);
@@ -163,9 +169,6 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
 
-  // ==========================================
-  // 1. COMMAND: /giveaway
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -187,9 +190,6 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
-  // ==========================================
-  // 2. COMMAND: /giveaway2 (Ticket Giveaway)
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -214,9 +214,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ embeds: [embed], components: [row] });
   }
 
-  // ==========================================
-  // 3. MAIN PARTICIPATE BUTTON (Creates Ticket)
-  // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
 
@@ -227,7 +224,6 @@ client.on('interactionCreate', async (interaction) => {
 
       const data = loadEntries();
       
-      // Admin bypass for 'pravesh_kumar1'
       if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
         return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
       }
@@ -269,9 +265,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // ==========================================
-  // 4. ENTER DETAILS BUTTON (Opens the Modal)
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('open_form_')) {
     const messageId = interaction.customId.split('_')[2];
     
@@ -288,9 +281,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 5. MODAL SUBMIT (Updates Ticket for Images)
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('giveaway_modal_')) {
     const messageId = interaction.customId.split('_')[2];
     const name = interaction.fields.getTextInputValue('form_name');
@@ -308,7 +298,6 @@ client.on('interactionCreate', async (interaction) => {
       )
       .setColor('#2ecc71');
 
-    // 🌟 BUTTON IS DISABLED INITIALLY 🌟
     const submitBtn = new ButtonBuilder().setCustomId(`submit_final_${messageId}`).setLabel('Submit Final Entry ✅').setStyle(ButtonStyle.Success).setDisabled(true);
     const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
     
@@ -317,9 +306,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ embeds: [embed], components: [row] });
   }
 
-  // ==========================================
-  // 6. FINAL SUBMIT BUTTON (Generates PDF File)
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
     const channel = interaction.channel;
@@ -384,18 +370,12 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // ==========================================
-  // 7. CANCEL TICKET BUTTON
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
     const channel = interaction.channel;
     await interaction.reply({ content: '❌ You have canceled the process. This channel is being deleted...', ephemeral: true });
     setTimeout(() => { channel.delete().catch(() => {}); }, 3000);
   }
 
-  // ==========================================
-  // 8. SPIN BUTTONS & CALCULATING WINNERS
-  // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
 

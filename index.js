@@ -409,7 +409,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const dmEmbed = new EmbedBuilder()
           .setTitle('🎉 Giveaway Entry Confirmed!')
-          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully Submitted** and your proofs have been securely recorded in our system.\n\nKeep an eye on the **<#1381521786629521419>** server for the winner announcement. Best of luck! 🍀`)
+          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully Submitted** \n\nKeep an eye on the **<#1513208232040988824>** server for the winner announcement. Best of luck! 🍀`)
           .setColor('#2ecc71')
           .setFooter({ text: 'Night Trader Community' });
 
@@ -466,6 +466,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
+    // 🌟 YAHAN WAPAS SECRET WINNERS ARRAY ADD KAR DIYA HAI 🌟
     const secretWinners = []; 
 
     let validUsers = [];
@@ -484,6 +485,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const totalEntriesCount = validUsers.length;
 
+    // Filter logic jo secretWinners ko handle karega
     validUsers = validUsers.filter(id => !secretWinners.includes(id));
     const shuffledEntries = validUsers.sort(() => 0.5 - Math.random());
     const randomSpotsToFill = Math.max(0, winnerCount - secretWinners.length);

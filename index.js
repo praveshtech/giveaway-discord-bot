@@ -30,12 +30,10 @@ const client = new Client({
 });
 
 // ==========================================
-// ⚙️ CONFIGURATION (CHANNEL ID SETTING)
+// ⚙️ CONFIGURATION
 // ==========================================
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
-
-// Database set up
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
   if (!fs.existsSync(dbPath)) return {};
@@ -45,7 +43,7 @@ function saveEntries(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
-// 🌟 FUNCTION: PDF Transcript Generator
+// PDF Generator Function
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     const doc = new PDFDocument({ margin: 40 });
@@ -119,10 +117,7 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  
-  // ==========================================
-  // 1. COMMAND: /giveaway
-  // ==========================================
+
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -144,9 +139,6 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
-  // ==========================================
-  // 2. COMMAND: /giveaway2 (Ticket Giveaway)
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -172,10 +164,9 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. PARTICIPATE BUTTON (With Timeout Fix)
+  // 3. MAIN PARTICIPATE BUTTON (Creates Ticket)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
-    // 🌟 TURANT DEFER: Isse Discord 3 second wala timeout nahi dega!
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -189,7 +180,6 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
       }
 
-      // 🌟 SAFE NAME: Channel name me emoji ya space allow nahi hote, isliye usko clean kiya
       const safeUsername = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
       const channelName = `entry-${safeUsername}`;
       
@@ -208,29 +198,79 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
+      // 🌟 STEP 1: Enter Details Button inside Ticket
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
-        .setDescription(`Welcome <@${user.id}>! To secure your entry, please complete the following steps:\n\n**1️⃣ Provide Your Details:**\nSend your **Name, Email, and YouTube Secret Word** in a single message in this chat.\n\n**2️⃣ Upload Screenshots:**\n👉 Screenshot of subscribing to the NT YouTube Channel.\n👉 Screenshot of your comment on the video.\n👉 Other (Optional).\n\n*Once everything is uploaded, click 'Submit ✅'. If you wish to cancel, click 'Cancel ❌'.*`)
+        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n**Step 1:** Click the **Enter Details 📝** button below to fill out the form.\n**Step 2:** After submitting the form, you will be asked to upload your screenshots.\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
-      const submitBtn = new ButtonBuilder().setCustomId(`submit_ticket_${messageId}`).setLabel('Submit ✅').setStyle(ButtonStyle.Success);
+      const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
       const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
       
-      const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
+      const row = new ActionRowBuilder().addComponents(formBtn, cancelBtn);
 
       await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
-      await interaction.editReply({ content: `✅ Your secure entry channel has been created! Please submit your proofs here: <#${channel.id}>` });
+      await interaction.editReply({ content: `✅ Ticket created! Please go here to continue: <#${channel.id}>` });
 
     } catch (error) {
       console.error("Participate Button Error: ", error);
-      await interaction.editReply({ content: '🚨 **Error!** Bot could not create the channel. Please ensure the bot has **"Manage Channels"** permission in Server Settings.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel. Please ensure the bot has **"Manage Channels"** permission.' });
     }
   }
 
   // ==========================================
-  // 4. SUBMIT TICKET BUTTON (Generates PDF File)
+  // 4. ENTER DETAILS BUTTON (Opens the Modal)
   // ==========================================
-  if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
+  if (interaction.isButton() && interaction.customId.startsWith('open_form_')) {
+    const messageId = interaction.customId.split('_')[2];
+    
+    const modal = new ModalBuilder()
+      .setCustomId(`giveaway_modal_${messageId}`)
+      .setTitle('Giveaway Entry Form');
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('form_name').setLabel('Your Name').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('form_email').setLabel('Your Email').setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('form_word').setLabel('YouTube Secret Word').setStyle(TextInputStyle.Short).setRequired(true))
+    );
+
+    await interaction.showModal(modal);
+  }
+
+  // ==========================================
+  // 5. MODAL SUBMIT (Updates Ticket for Images)
+  // ==========================================
+  if (interaction.isModalSubmit() && interaction.customId.startsWith('giveaway_modal_')) {
+    const messageId = interaction.customId.split('_')[2];
+    const name = interaction.fields.getTextInputValue('form_name');
+    const email = interaction.fields.getTextInputValue('form_email');
+    const word = interaction.fields.getTextInputValue('form_word');
+    const user = interaction.user;
+
+    // 🌟 STEP 2: Details aa gayi, ab Image Upload mango
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Details Saved! Now Upload Proofs')
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n**Next Step:**\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.). \nOnce all images are uploaded, click **Submit Final Entry ✅** below.`)
+      .addFields(
+        { name: '👤 Name', value: name, inline: true },
+        { name: '📧 Email', value: email, inline: true },
+        { name: '🔑 Word', value: word, inline: true }
+      )
+      .setColor('#2ecc71');
+
+    const submitBtn = new ButtonBuilder().setCustomId(`submit_final_${messageId}`).setLabel('Submit Final Entry ✅').setStyle(ButtonStyle.Success);
+    const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
+    
+    const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
+
+    // Ye purane message ko edit karke naya instruction dikhayega
+    await interaction.update({ embeds: [embed], components: [row] });
+  }
+
+  // ==========================================
+  // 6. FINAL SUBMIT BUTTON (Generates PDF File)
+  // ==========================================
+  if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
     const channel = interaction.channel;
     const user = interaction.user;
@@ -238,19 +278,27 @@ client.on('interactionCreate', async (interaction) => {
 
     const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
     if (!logChannel) {
-      return interaction.reply({ content: '🚨 Setup Error: Entry log channel not found! Please verify the **LOG_CHANNEL_ID** inside your `index.js` file.', ephemeral: true });
+      return interaction.reply({ content: '🚨 Setup Error: Entry log channel not found!', ephemeral: true });
     }
 
-    await interaction.reply({ content: '⏳ Checking your details and processing PDF transcript...', ephemeral: true });
+    await interaction.reply({ content: '⏳ Checking your proofs and processing PDF transcript...', ephemeral: true });
 
     const messages = await channel.messages.fetch({ limit: 50 });
-    const userMessages = messages.filter(m => m.author.id === user.id);
-
+    
+    // Scrape Text Data from Bot's updated embed
     let textData = [];
-    let imageUrls = [];
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '✅ Details Saved! Now Upload Proofs');
+    
+    if (botMsg && botMsg.embeds.length > 0) {
+      botMsg.embeds[0].fields.forEach(f => textData.push(`${f.name}: ${f.value}`));
+    } else {
+      textData.push("Details manually provided.");
+    }
 
+    // Scrape Image URLs from User's messages
+    const userMessages = messages.filter(m => m.author.id === user.id);
+    let imageUrls = [];
     userMessages.forEach(msg => {
-      if (msg.content) textData.push(msg.content);
       msg.attachments.forEach(attachment => {
         if (attachment.contentType && attachment.contentType.startsWith('image/')) {
           imageUrls.push(attachment.url);
@@ -258,8 +306,8 @@ client.on('interactionCreate', async (interaction) => {
       });
     });
 
-    if (textData.length === 0 || imageUrls.length === 0) {
-      return interaction.editReply({ content: '🚨 Incomplete data! Please provide your Name/Email and upload at least 1 screenshot, then click Submit again.' });
+    if (imageUrls.length === 0) {
+      return interaction.editReply({ content: '🚨 No Images Found! Please upload at least 1 screenshot in this chat, then click Submit again.' });
     }
 
     try {
@@ -284,25 +332,21 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("PDF Transcript Error:", error);
-      await interaction.editReply({ content: '🚨 **Error!** Bot could not generate or send the PDF transcript. Please ensure the bot has permission to attach files.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not generate or send the PDF. Ensure bot has attach file permissions.' });
     }
   }
 
   // ==========================================
-  // 5. CANCEL TICKET BUTTON
+  // 7. CANCEL TICKET BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
     const channel = interaction.channel;
-    
     await interaction.reply({ content: '❌ You have canceled the process. This channel is being deleted...', ephemeral: true });
-    
-    setTimeout(() => {
-      channel.delete().catch(() => {});
-    }, 3000);
+    setTimeout(() => { channel.delete().catch(() => {}); }, 3000);
   }
 
   // ==========================================
-  // 6. SPIN BUTTONS
+  // 8. SPIN BUTTONS & CALCULATING WINNERS
   // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
@@ -322,9 +366,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 7. CALCULATING WINNERS
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const parts = interaction.customId.split('_');
     const messageId = parts[2];
@@ -391,5 +432,4 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.on('error', console.error);
-
 client.login(process.env.BOT_TOKEN);

@@ -43,7 +43,7 @@ function saveEntries(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
-// PDF Generator Function
+// 🌟 PDF Generator Function
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     const doc = new PDFDocument({ margin: 40 });
@@ -116,8 +116,43 @@ client.once('ready', async () => {
   console.log('✅ Commands /giveaway and /giveaway2 registered.');
 });
 
+// ==========================================
+// 🌟 SMART IMAGE DETECTION LOGIC (Auto-Enable Button)
+// ==========================================
+client.on('messageCreate', async (message) => {
+  if (!message.channel.name.startsWith('entry-') || message.author.bot) return;
+
+  if (message.attachments.size > 0) {
+    const hasImage = message.attachments.some(a => a.contentType && a.contentType.startsWith('image/'));
+    
+    if (hasImage) {
+      try {
+        const messages = await message.channel.messages.fetch({ limit: 15 });
+        const botMsg = messages.find(m => m.author.id === client.user.id && m.components.length > 0 && m.embeds[0]?.title === '✅ Details Saved! Now Upload Proofs');
+
+        if (botMsg) {
+          const customIdSubmit = botMsg.components[0].components[0].customId;
+          const customIdCancel = botMsg.components[0].components[1].customId;
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(customIdSubmit).setLabel('Submit Final Entry ✅').setStyle(ButtonStyle.Success).setDisabled(false),
+            new ButtonBuilder().setCustomId(customIdCancel).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger)
+          );
+          
+          await botMsg.edit({ components: [row] });
+        }
+      } catch (err) {
+        console.error("Image Detection Error:", err);
+      }
+    }
+  }
+});
+
 client.on('interactionCreate', async (interaction) => {
 
+  // ==========================================
+  // 1. COMMAND: /giveaway
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -139,6 +174,9 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
+  // ==========================================
+  // 2. COMMAND: /giveaway2 (Ticket Giveaway)
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -176,6 +214,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const data = loadEntries();
       
+      // Admin bypass for 'pravesh_kumar1'
       if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
         return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
       }
@@ -198,10 +237,9 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
-      // 🌟 STEP 1: Enter Details Button inside Ticket
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
-        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n**Step 1:** Click the **Enter Details 📝** button below to fill out the form.\n**Step 2:** After submitting the form, you will be asked to upload your screenshots.\n\n*Click Cancel if you don't want to participate.*`)
+        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n**Step 1:** Click the **Enter Details 📝** button below to fill out the form.\n**Step 2:** After submitting the form, upload your screenshots in this chat.\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
       const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
@@ -247,10 +285,9 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
-    // 🌟 STEP 2: Details aa gayi, ab Image Upload mango
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
-      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n**Next Step:**\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.). \nOnce all images are uploaded, click **Submit Final Entry ✅** below.`)
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n**Next Step:**\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.). \nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
       .addFields(
         { name: '👤 Name', value: name, inline: true },
         { name: '📧 Email', value: email, inline: true },
@@ -258,12 +295,12 @@ client.on('interactionCreate', async (interaction) => {
       )
       .setColor('#2ecc71');
 
-    const submitBtn = new ButtonBuilder().setCustomId(`submit_final_${messageId}`).setLabel('Submit Final Entry ✅').setStyle(ButtonStyle.Success);
+    // 🌟 BUTTON IS DISABLED INITIALLY 🌟
+    const submitBtn = new ButtonBuilder().setCustomId(`submit_final_${messageId}`).setLabel('Submit Final Entry ✅').setStyle(ButtonStyle.Success).setDisabled(true);
     const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
     
     const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
 
-    // Ye purane message ko edit karke naya instruction dikhayega
     await interaction.update({ embeds: [embed], components: [row] });
   }
 
@@ -285,7 +322,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const messages = await channel.messages.fetch({ limit: 50 });
     
-    // Scrape Text Data from Bot's updated embed
     let textData = [];
     const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '✅ Details Saved! Now Upload Proofs');
     
@@ -295,7 +331,6 @@ client.on('interactionCreate', async (interaction) => {
       textData.push("Details manually provided.");
     }
 
-    // Scrape Image URLs from User's messages
     const userMessages = messages.filter(m => m.author.id === user.id);
     let imageUrls = [];
     userMessages.forEach(msg => {

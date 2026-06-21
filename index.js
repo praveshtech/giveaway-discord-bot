@@ -65,7 +65,7 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (interaction) => {
   
   // ==========================================
-  // 1. COMMAND: /giveaway (Purana Wala)
+  // 1. COMMAND: /giveaway
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
@@ -89,7 +89,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 2. COMMAND: /giveaway2 (Naya Ticket Wala)
+  // 2. COMMAND: /giveaway2 (Ticket Giveaway)
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
@@ -116,7 +116,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. PARTICIPATE BUTTON (Creates Private KYC Ticket)
+  // 3. PARTICIPATE BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     const user = interaction.user;
@@ -125,13 +125,13 @@ client.on('interactionCreate', async (interaction) => {
 
     const data = loadEntries();
     if (data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
-      return interaction.reply({ content: '🚨 Aap pehle hi apni entry submit kar chuke ho!', ephemeral: true });
+      return interaction.reply({ content: '🚨 You have already submitted your entry for this giveaway!', ephemeral: true });
     }
 
     const channelName = `entry-${user.username.toLowerCase()}`;
     const existingChannel = guild.channels.cache.find(c => c.name === channelName);
     if (existingChannel) {
-      return interaction.reply({ content: `🚨 Aapka verification channel pehle se khula hai: <#${existingChannel.id}>`, ephemeral: true });
+      return interaction.reply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>`, ephemeral: true });
     }
 
     const channel = await guild.channels.create({
@@ -146,7 +146,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const embed = new EmbedBuilder()
       .setTitle('📝 Giveaway Verification Process')
-      .setDescription(`Welcome <@${user.id}>! Apni entry pakki karne ke liye yahan ye kaam karein:\n\n**1️⃣ Apni Details Likhein:**\nChat me apna **Name, Email, aur YouTube Secret Word** ek message me likh kar bhejein.\n\n**2️⃣ Screenshots Upload Karein:**\n👉 NT YouTube Channel Subscribe ka screenshot.\n👉 Video pe Comment ka screenshot.\n👉 Other (Optional).\n\n*Jab sab upload ho jaye toh 'Submit' dabayein. Agar participate nahi karna toh 'Cancel' dabayein.*`)
+      .setDescription(`Welcome <@${user.id}>! To secure your entry, please complete the following steps:\n\n**1️⃣ Provide Your Details:**\nSend your **Name, Email, and YouTube Secret Word** in a single message in this chat.\n\n**2️⃣ Upload Screenshots:**\n👉 Screenshot of subscribing to the NT YouTube Channel.\n👉 Screenshot of your comment on the video.\n👉 Other (Optional).\n\n*Once everything is uploaded, click 'Submit ✅'. If you wish to cancel, click 'Cancel ❌'.*`)
       .setColor('#2b2d31');
 
     const submitBtn = new ButtonBuilder().setCustomId(`submit_ticket_${messageId}`).setLabel('Submit ✅').setStyle(ButtonStyle.Success);
@@ -155,11 +155,11 @@ client.on('interactionCreate', async (interaction) => {
     const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
 
     await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
-    await interaction.reply({ content: `✅ Aapka secure entry channel ban gaya hai! Jaldi yahan jaakar proof bhejein: <#${channel.id}>`, ephemeral: true });
+    await interaction.reply({ content: `✅ Your secure entry channel has been created! Please submit your proofs here: <#${channel.id}>`, ephemeral: true });
   }
 
   // ==========================================
-  // 4. SUBMIT TICKET BUTTON (Saves Data & Closes)
+  // 4. SUBMIT TICKET BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -184,7 +184,7 @@ client.on('interactionCreate', async (interaction) => {
     });
 
     if (textData.length === 0 || imageUrls.length === 0) {
-      return interaction.editReply({ content: '🚨 Pura data nahi mila! Kripya apna Name/Email likhein aur kam se kam 1 screenshot upload zaroor karein uske baad dobara Submit dabayein.' });
+      return interaction.editReply({ content: '🚨 Incomplete data! Please provide your Name/Email and upload at least 1 screenshot, then click Submit again.' });
     }
 
     const data = loadEntries();
@@ -197,7 +197,7 @@ client.on('interactionCreate', async (interaction) => {
     });
     saveEntries(data);
 
-    await interaction.editReply({ content: '✅ **Entry Successful!** Aapka data aur proof safe ho gaya hai. Ye channel 5 seconds me band ho jayega...' });
+    await interaction.editReply({ content: '✅ **Entry Successful!** Your details and proofs have been safely recorded. This channel will close in 5 seconds...' });
 
     setTimeout(() => {
       channel.delete().catch(() => {});
@@ -205,12 +205,12 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 5. CANCEL TICKET BUTTON (Deletes Without Saving)
+  // 5. CANCEL TICKET BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
     const channel = interaction.channel;
     
-    await interaction.reply({ content: '❌ Aapne process cancel kar diya hai. Ye channel delete kiya jaa raha hai...', ephemeral: true });
+    await interaction.reply({ content: '❌ You have canceled the process. This channel is being deleted...', ephemeral: true });
     
     setTimeout(() => {
       channel.delete().catch(() => {});
@@ -247,7 +247,7 @@ client.on('interactionCreate', async (interaction) => {
     const spinType = parts.slice(3).join('_'); 
     const winnerCount = parseInt(interaction.fields.getTextInputValue('winner_count'));
 
-    if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter valid number!', ephemeral: true });
+    if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
     // 🚨 THE SECRET LOOPHOLE (EMPTY) 🚨
     const secretWinners = []; 
@@ -262,7 +262,7 @@ client.on('interactionCreate', async (interaction) => {
       validUsers = users.filter(user => !user.bot).map(user => user.id);
     } else {
       const data = loadEntries();
-      if (!data[messageId] || data[messageId].length === 0) return interaction.reply({ content: 'No one has submitted the form yet!', ephemeral: true });
+      if (!data[messageId] || data[messageId].length === 0) return interaction.reply({ content: 'No one has submitted an entry yet!', ephemeral: true });
       validUsers = data[messageId].map(entry => entry.userId);
     }
 

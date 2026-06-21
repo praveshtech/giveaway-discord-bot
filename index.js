@@ -13,7 +13,8 @@ const {
   ChannelType,
   TextInputBuilder,
   TextInputStyle,
-  ModalBuilder
+  ModalBuilder,
+  AttachmentBuilder 
 } = require('discord.js');
 
 const client = new Client({
@@ -28,7 +29,7 @@ const client = new Client({
 // ==========================================
 // ⚙️ CONFIGURATION (CHANNEL ID SETTING)
 // ==========================================
-// Apne 'giveaways-entry' channel ki ID niche single quotes ke andar daalein 👇
+// Aapke 'giveaways-entry' channel ki ID 👇
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
 
@@ -146,8 +147,8 @@ client.on('interactionCreate', async (interaction) => {
       type: ChannelType.GuildText,
       permissionOverwrites: [
         { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] }, 
-        { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] } 
+        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
+        { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory] } 
       ]
     });
 
@@ -166,7 +167,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. SUBMIT TICKET BUTTON (Using ID Lookup)
+  // 4. SUBMIT TICKET BUTTON (Transcript File Logic)
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -174,7 +175,6 @@ client.on('interactionCreate', async (interaction) => {
     const user = interaction.user;
     const guild = interaction.guild;
 
-    // 🌟 Ab channel ko ID ke zariye dhoondha jaa raha hai
     const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
     if (!logChannel) {
       return interaction.reply({ content: '🚨 Setup Error: Entry log channel not found! Please verify the **LOG_CHANNEL_ID** inside your `index.js` file.', ephemeral: true });
@@ -201,30 +201,68 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.editReply({ content: '🚨 Incomplete data! Please provide your Name/Email and upload at least 1 screenshot, then click Submit again.' });
     }
 
-    const data = loadEntries();
-    if (!data[messageId]) data[messageId] = [];
-    data[messageId].push({ userId: user.id });
-    saveEntries(data);
+    try {
+      // Background me ID save karna spin wheel ke liye
+      const data = loadEntries();
+      if (!data[messageId]) data[messageId] = [];
+      data[messageId].push({ userId: user.id });
+      saveEntries(data);
 
-    const transcriptEmbed = new EmbedBuilder()
-      .setTitle(`📝 New Giveaway Entry`)
-      .addFields(
-        { name: 'User', value: `<@${user.id}> (${user.tag})` },
-        { name: 'Details Provided', value: textData.join('\n\n') || 'No text provided' }
-      )
-      .setColor('#2ecc71');
+      // 🌟 DYNAMIC HTML TRANSCRIPT BANANA 🌟 (Dark Mode Theme)
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Giveaway Entry - ${user.tag}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #313338; color: #dbdee1; padding: 20px; }
+          .box { background-color: #2b2d31; padding: 25px; border-radius: 8px; max-width: 700px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+          h2 { color: #f2f3f5; border-bottom: 2px solid #1e1f22; padding-bottom: 10px; margin-top: 0; }
+          .info { background: #1e1f22; padding: 15px; border-radius: 6px; font-size: 16px; margin-bottom: 20px; white-space: pre-wrap; word-wrap: break-word;}
+          .images img { max-width: 100%; border-radius: 8px; margin-bottom: 15px; border: 2px solid #1e1f22; }
+          .footer { text-align: center; font-size: 12px; color: #80848e; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="box">
+          <h2>🎁 Giveaway Entry Transcript</h2>
+          <p><strong>Discord User:</strong> ${user.tag} (ID: ${user.id})</p>
+          
+          <h3>📝 Details Provided:</h3>
+          <div class="info">${textData.join('\n')}</div>
+          
+          <h3>📸 Uploaded Screenshots:</h3>
+          <div class="images">
+            ${imageUrls.map(url => `<a href="${url}" target="_blank"><img src="${url}" alt="User Proof"></a>`).join('<br>')}
+          </div>
+        </div>
+        <div class="footer">Generated by NT Giveaway Bot</div>
+      </body>
+      </html>
+      `;
 
-    await logChannel.send({ embeds: [transcriptEmbed] });
-    
-    if (imageUrls.length > 0) {
-      await logChannel.send({ content: `**📸 Screenshots from <@${user.id}>:**\n${imageUrls.join('\n')}` });
+      // HTML String ko ek asli File (.html) me convert karna
+      const buffer = Buffer.from(htmlContent, 'utf-8');
+      const attachment = new AttachmentBuilder(buffer, { name: `transcript_${user.username}.html` });
+
+      // Log channel me bas ek chota sa message aur file bhejna
+      await logChannel.send({ 
+        content: `📄 **New Verified Entry by:** <@${user.id}>`,
+        files: [attachment]
+      });
+
+      await interaction.editReply({ content: '✅ **Entry Successful!** Your details and proofs have been safely recorded. This channel will close in 5 seconds...' });
+
+      setTimeout(() => {
+        channel.delete().catch(() => {});
+      }, 5000);
+
+    } catch (error) {
+      console.error("Transcript Error:", error);
+      await interaction.editReply({ content: '🚨 **Error!** Bot could not send the transcript. Please ensure it has `Send Messages` and `Attach Files` permissions.' });
     }
-
-    await interaction.editReply({ content: '✅ **Entry Successful!** Your details and proofs have been safely recorded. This channel will close in 5 seconds...' });
-
-    setTimeout(() => {
-      channel.delete().catch(() => {});
-    }, 5000);
   }
 
   // ==========================================

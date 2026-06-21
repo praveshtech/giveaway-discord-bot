@@ -389,7 +389,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const dmEmbed = new EmbedBuilder()
           .setTitle('🎉 Giveaway Entry Confirmed!')
-          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully verified** and your proofs have been securely recorded in our system.\n\nKeep an eye on the **Night Trader** server for the winner announcement. Best of luck! 🍀`)
+          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully Submitted** and your proofs have been securely recorded in our system.\n\nKeep an eye on the **<#1381521786629521419>** server for the winner announcement. Best of luck! 🍀`)
           .setColor('#2ecc71')
           .setFooter({ text: 'Night Trader Community' });
 

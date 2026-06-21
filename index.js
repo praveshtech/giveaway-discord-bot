@@ -30,9 +30,12 @@ const client = new Client({
 });
 
 // ==========================================
-// ⚙️ CONFIGURATION
+// ⚙️ CONFIGURATION (YAHAN APNA SECRET CODE DAALEIN)
 // ==========================================
 const LOG_CHANNEL_ID = '1518225181472985148'; 
+
+// 👇 AAJ KE GIVEAWAY KA SAHI CODE  👇
+const CORRECT_SECRET_WORD = 'AHPLA'; // Ise lowercase me likhna best hai
 
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
@@ -49,7 +52,6 @@ function saveEntries(data) {
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     
-    // Har image ke liye alag page (1 Image = 1 Page Logic)
     const doc = new PDFDocument({ margin: 40 }); 
     let buffers = [];
     
@@ -60,7 +62,6 @@ function generatePDFTranscript(user, textData, imageUrls) {
 
     const removeEmojis = (str) => str.replace(/[^\x00-\x7F]/g, "").trim();
 
-    // --- PAGE 1: USER DETAILS ---
     doc.fontSize(20).fillColor('#111111').text('Giveaway Entry Transcript', { align: 'center', underline: true });
     doc.moveDown(1.5);
 
@@ -75,7 +76,6 @@ function generatePDFTranscript(user, textData, imageUrls) {
     const cleanTextData = textData.map(line => removeEmojis(line));
     doc.fontSize(12).fillColor('#111111').text(cleanTextData.join('\n\n'));
     
-    // --- NEXT PAGES: 1 IMAGE PER PAGE ---
     for (let i = 0; i < imageUrls.length; i++) {
       try {
         const response = await axios.get(imageUrls[i], { responseType: 'arraybuffer' });
@@ -163,15 +163,29 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
 
   // ==========================================
-  // 1. COMMAND: /clearentries (Database Reset)
+  // 1. COMMAND: /clearentries
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
     }
 
-    saveEntries({});
-    return interaction.reply({ content: '🗑️ **Success!** All previous giveaway entries have been deleted. Database is now clean and ready for the next giveaway! ✅', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      saveEntries({});
+      const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+      if (logChannel) {
+        const messages = await logChannel.messages.fetch({ limit: 100 });
+        if (messages.size > 0) {
+          await logChannel.bulkDelete(messages, true);
+        }
+      }
+      return interaction.editReply({ content: '🗑️ **Success!** Database is clean AND all old PDFs have been removed from the entry channel! ✅' });
+    } catch (error) {
+      console.error(error);
+      return interaction.editReply({ content: '✅ Database cleared, but could not delete old messages.' });
+    }
   }
 
   // ==========================================
@@ -242,7 +256,6 @@ client.on('interactionCreate', async (interaction) => {
 
       const data = loadEntries();
       
-      // 🌟 YAHAN SE IMMUNITY HATA DI GAYI HAI 🌟
       if (data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
         return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
       }
@@ -255,9 +268,24 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>` });
       }
 
+      const categoryName = '🎫 Giveaway Tickets';
+      let category = guild.channels.cache.find(c => c.name === categoryName && c.type === ChannelType.GuildCategory);
+      
+      if (!category) {
+        category = await guild.channels.create({
+          name: categoryName,
+          type: ChannelType.GuildCategory,
+          permissionOverwrites: [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
+            { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] }
+          ]
+        });
+      }
+
       const channel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
+        parent: category.id, 
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
           { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
@@ -265,7 +293,6 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
-      // 🌟 TEXT SIZE INCREASED HERE 🌟
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
         .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n## 1️⃣ Step 1:\n**Click the Enter Details 📝 button below to fill out the form.**\n\n## 2️⃣ Step 2:\n**After submitting the form, upload your screenshots in this chat.**\n\n*Click Cancel if you don't want to participate.*`)
@@ -314,7 +341,6 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
-    // 🌟 TEXT SIZE INCREASED HERE 🌟
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
       .setDescription(`Great <@${user.id}>! Your details are saved.\n\n## 📸 Next Step:\n\n### 1. Subscribe To Night Trader YouTube Channel\n\n### 2. Comment On Latest Video\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
@@ -334,7 +360,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 7. FINAL SUBMIT BUTTON (Generates PDF + DM)
+  // 7. FINAL SUBMIT BUTTON (Generates PDF, saves Word + DM)
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -352,10 +378,17 @@ client.on('interactionCreate', async (interaction) => {
     const messages = await channel.messages.fetch({ limit: 50 });
     
     let textData = [];
+    let userSecretWord = ""; // User ne jo code daala wo store hoga
     const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '✅ Details Saved! Now Upload Proofs');
     
     if (botMsg && botMsg.embeds.length > 0) {
-      botMsg.embeds[0].fields.forEach(f => textData.push(`${f.name}: ${f.value}`));
+      botMsg.embeds[0].fields.forEach(f => {
+        textData.push(`${f.name}: ${f.value}`);
+        if (f.name === '🔑 Word') {
+          // Extra spaces ko remove kar ke normal format me karna
+          userSecretWord = f.value.toLowerCase().replace(/\s+/g, ''); 
+        }
+      });
     } else {
       textData.push("Details manually provided.");
     }
@@ -377,14 +410,15 @@ client.on('interactionCreate', async (interaction) => {
     try {
       const data = loadEntries();
       if (!data[messageId]) data[messageId] = [];
-      data[messageId].push({ userId: user.id });
+      // 🌟 YAHAN DATABASE ME USER KI ID KE SATH USKA CODE BHI SAVE HO RAHA HAI 🌟
+      data[messageId].push({ userId: user.id, secretWord: userSecretWord }); 
       saveEntries(data);
 
       const pdfBuffer = await generatePDFTranscript(user, textData, imageUrls);
       const attachment = new AttachmentBuilder(pdfBuffer, { name: `transcript_${user.username}.pdf` });
 
       await logChannel.send({ 
-        content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})`,
+        content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})\n🔑 Submitted Code: **${userSecretWord}**`,
         files: [attachment]
       });
 
@@ -451,10 +485,10 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
-    // 🌟 YAHAN WAPAS SECRET WINNERS ARRAY ADD KAR DIYA HAI 🌟
     const secretWinners = []; 
 
     let validUsers = [];
+    let totalEntriesCount = 0;
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 
     if (spinType === 'spin_giveaway_1') {
@@ -462,22 +496,31 @@ client.on('interactionCreate', async (interaction) => {
       if (!reaction) return interaction.reply({ content: 'No entries yet!', ephemeral: true });
       const users = await reaction.users.fetch();
       validUsers = users.filter(user => !user.bot).map(user => user.id);
+      totalEntriesCount = validUsers.length;
     } else {
       const data = loadEntries();
       if (!data[messageId] || data[messageId].length === 0) return interaction.reply({ content: 'No one has submitted an entry yet!', ephemeral: true });
-      validUsers = data[messageId].map(entry => entry.userId);
+      
+      totalEntriesCount = data[messageId].length; // Total log jinhone form bhara
+      
+      // 🌟 MAGIC: FILTER BY EXACT SECRET WORD 🌟
+      const masterCode = CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
+      const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
+      
+      if (correctEntries.length === 0) {
+        return interaction.reply({ content: `🚨 Kisine bhi video dekhkar sahi code (**${CORRECT_SECRET_WORD}**) nahi dala hai! Koi winner nahi hai.`, ephemeral: true });
+      }
+      
+      validUsers = correctEntries.map(entry => entry.userId);
     }
 
-    const totalEntriesCount = validUsers.length;
-
-    // Filter logic jo secretWinners ko handle karega
     validUsers = validUsers.filter(id => !secretWinners.includes(id));
     const shuffledEntries = validUsers.sort(() => 0.5 - Math.random());
     const randomSpotsToFill = Math.max(0, winnerCount - secretWinners.length);
     const randomWinners = shuffledEntries.slice(0, randomSpotsToFill);
     
     let finalWinners = [...secretWinners, ...randomWinners].sort(() => 0.5 - Math.random());
-    if (finalWinners.length === 0) return interaction.reply({ content: 'Not enough entries.', ephemeral: true });
+    if (finalWinners.length === 0) return interaction.reply({ content: 'Not enough valid entries.', ephemeral: true });
 
     const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
 
@@ -498,14 +541,14 @@ client.on('interactionCreate', async (interaction) => {
       const resultEmbed = EmbedBuilder.from(oldEmbed)
         .setDescription(`**GIVEAWAY ENDED!** 🎉\n\n**Winners:** ${winnerMentions}`)
         .addFields(
-          { name: 'Total Entries', value: `${totalEntriesCount}`, inline: true }, 
+          { name: 'Total Valid Entries', value: `${validUsers.length} / ${totalEntriesCount}`, inline: true }, 
           { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: true }
         )
         .setColor('#5865F2')
         .setImage(null); 
 
       await giveawayMessage.edit({ embeds: [resultEmbed], components: [] });
-      await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!`);
+      await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**! (Correct Code Verified ✅)`);
     }, 4000);
   }
 });

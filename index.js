@@ -43,7 +43,9 @@ function saveEntries(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
-// 🌟 PDF Generator Function
+// ==========================================
+// 🌟 PDF Generator Function (Fixed Symbols & Image Cut)
+// ==========================================
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     const doc = new PDFDocument({ margin: 40 });
@@ -54,20 +56,30 @@ function generatePDFTranscript(user, textData, imageUrls) {
       resolve(Buffer.concat(buffers));
     });
 
-    doc.fontSize(22).fillColor('#111111').text('🎉 Giveaway Entry Transcript', { align: 'center' });
+    // Helper: Emojis ko hatane ke liye (Taki kachra symbols na aayein)
+    const removeEmojis = (str) => str.replace(/[^\x00-\x7F]/g, "").trim();
+
+    // Header Title (Clean)
+    doc.fontSize(20).fillColor('#111111').text('Giveaway Entry Transcript', { align: 'center', underline: true });
     doc.moveDown(1.5);
 
-    doc.fontSize(12).fillColor('#333333').text(`Discord User: ${user.tag}`);
+    // User Profile Data
+    doc.fontSize(12).fillColor('#333333').text(`Discord User: ${removeEmojis(user.tag)}`);
     doc.text(`User ID: ${user.id}`);
     doc.text(`Submitted Date: ${new Date().toLocaleString()}`);
     doc.moveDown(2);
 
-    doc.fontSize(15).fillColor('#007bff').text('📝 Provided Details:', { underline: true });
+    // Form Text Details
+    doc.fontSize(14).fillColor('#007bff').text('Provided Details:', { underline: true });
     doc.moveDown(0.5);
-    doc.fontSize(12).fillColor('#111111').text(textData.join('\n\n'));
+
+    // Emojis hata kar clean details dalna
+    const cleanTextData = textData.map(line => removeEmojis(line));
+    doc.fontSize(12).fillColor('#111111').text(cleanTextData.join('\n\n'));
     doc.moveDown(2);
 
-    doc.fontSize(15).fillColor('#007bff').text('📸 Uploaded Proofs (Screenshots):', { underline: true });
+    // Screenshots Header
+    doc.fontSize(14).fillColor('#007bff').text('Uploaded Proofs (Screenshots):', { underline: true });
     doc.moveDown(1);
 
     for (let i = 0; i < imageUrls.length; i++) {
@@ -77,10 +89,11 @@ function generatePDFTranscript(user, textData, imageUrls) {
         
         doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
         doc.moveDown(0.5);
-        doc.image(imgBuffer, { fit: [450, 350], align: 'center' });
+        // Image fit ratio thoda chota kiya taaki cut na ho
+        doc.image(imgBuffer, { fit: [350, 250], align: 'center' });
         doc.moveDown(2);
       } catch (err) {
-        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically. Link: ${imageUrls[i]}]`);
+        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically]`);
         doc.moveDown(1);
       }
     }

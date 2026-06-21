@@ -29,7 +29,7 @@ const client = new Client({
 // ⚙️ CONFIGURATION (CHANNEL ID SETTING)
 // ==========================================
 // Apne 'giveaways-entry' channel ki ID niche single quotes ke andar daalein 👇
-const LOG_CHANNEL_ID = '123456789012345678'; 
+const LOG_CHANNEL_ID = '1518225181472985148'; 
 
 
 // Database set up

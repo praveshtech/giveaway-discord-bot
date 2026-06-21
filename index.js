@@ -264,7 +264,6 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
-      // 🌟 STEP 1 AND 2 SIZE AND SPACING INCREASED 🌟
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
         .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n### 1️⃣ Step 1:\nClick the **Enter Details 📝** button below to fill out the form.\n\n\n### 2️⃣ Step 2:\nAfter submitting the form, upload your **screenshots** in this chat.\n\n\n*Click Cancel if you don't want to participate.*`)
@@ -313,10 +312,10 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
-    // 🌟 NEXT STEP BADA AUR CLEAR KIYA 🌟
+    // 🌟 YAHAN NEXT STEP KO UPDATE KIYA GAYA HAI 🌟
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
-      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.).\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\n**1.** Subscribe To Night Trader YouTube Channel\n**2.** Comment On Latest Video\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
       .addFields(
         { name: '👤 Name', value: name, inline: true },
         { name: '📧 Email', value: email, inline: true },

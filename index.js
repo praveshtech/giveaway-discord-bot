@@ -9,20 +9,23 @@ const {
   ButtonBuilder, 
   ButtonStyle, 
   PermissionsBitField, 
-  ModalBuilder, 
-  TextInputBuilder, 
+  ApplicationCommandOptionType,
+  ChannelType,
+  TextInputBuilder,
   TextInputStyle,
-  ApplicationCommandOptionType 
+  ModalBuilder
 } = require('discord.js');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.MessageContent 
   ]
 });
 
+// Database (Local JSON file) set up for Form Entries
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
   if (!fs.existsSync(dbPath)) return {};
@@ -47,7 +50,7 @@ client.once('ready', async () => {
     },
     {
       name: 'giveaway2',
-      description: 'Launch YouTube Word Giveaway with Form and Thumbnail',
+      description: 'Launch YouTube Word Giveaway with Private Entry Channel',
       options: [
         { name: 'prize', description: 'Prize Name', type: ApplicationCommandOptionType.String, required: true },
         { name: 'duration', description: 'Time in MINUTES', type: ApplicationCommandOptionType.Integer, required: true },
@@ -61,6 +64,9 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (interaction) => {
   
+  // ==========================================
+  // 1. COMMAND: /giveaway (Purana Wala)
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -82,18 +88,21 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
+  // ==========================================
+  // 2. COMMAND: /giveaway2 (Naya Ticket Wala)
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
     const prize = interaction.options.getString('prize');
     const durationMinutes = interaction.options.getInteger('duration');
     const image = interaction.options.getAttachment('image');
-    const rawRules = interaction.options.getString('rules') || 'Click "Participate" to enter your details!';
+    const rawRules = interaction.options.getString('rules') || 'Click "Participate" to open your verification channel!';
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
 
     const embed = new EmbedBuilder()
       .setTitle(`🎁 SPECIAL GIVEAWAY: ${prize}`)
-      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button and fill the form!*`)
+      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button to submit your details and screenshots!*`)
       .setImage(image.url)
       .setColor('#ff0000') 
       .setFooter({ text: `Hosted by: ${interaction.user.username}` });
@@ -106,45 +115,111 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ embeds: [embed], components: [row] });
   }
 
+  // ==========================================
+  // 3. PARTICIPATE BUTTON (Creates Private KYC Ticket)
+  // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
-    const modal = new ModalBuilder()
-      .setCustomId(`form_participate_${interaction.message.id}`)
-      .setTitle('Giveaway Entry Form');
+    const user = interaction.user;
+    const guild = interaction.guild;
+    const messageId = interaction.message.id;
 
-    const nameInput = new TextInputBuilder().setCustomId('user_name').setLabel('Your Name').setStyle(TextInputStyle.Short).setRequired(true);
-    const emailInput = new TextInputBuilder().setCustomId('user_email').setLabel('Your Email').setStyle(TextInputStyle.Short).setRequired(true);
-    const wordInput = new TextInputBuilder().setCustomId('secret_word').setLabel('YouTube Secret Word').setStyle(TextInputStyle.Short).setRequired(true);
+    const data = loadEntries();
+    if (data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
+      return interaction.reply({ content: '🚨 Aap pehle hi apni entry submit kar chuke ho!', ephemeral: true });
+    }
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(nameInput),
-      new ActionRowBuilder().addComponents(emailInput),
-      new ActionRowBuilder().addComponents(wordInput)
-    );
+    const channelName = `entry-${user.username.toLowerCase()}`;
+    const existingChannel = guild.channels.cache.find(c => c.name === channelName);
+    if (existingChannel) {
+      return interaction.reply({ content: `🚨 Aapka verification channel pehle se khula hai: <#${existingChannel.id}>`, ephemeral: true });
+    }
 
-    await interaction.showModal(modal);
+    const channel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
+        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] }, 
+        { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] } 
+      ]
+    });
+
+    const embed = new EmbedBuilder()
+      .setTitle('📝 Giveaway Verification Process')
+      .setDescription(`Welcome <@${user.id}>! Apni entry pakki karne ke liye yahan ye kaam karein:\n\n**1️⃣ Apni Details Likhein:**\nChat me apna **Name, Email, aur YouTube Secret Word** ek message me likh kar bhejein.\n\n**2️⃣ Screenshots Upload Karein:**\n👉 NT YouTube Channel Subscribe ka screenshot.\n👉 Video pe Comment ka screenshot.\n👉 Other (Optional).\n\n*Jab sab upload ho jaye toh 'Submit' dabayein. Agar participate nahi karna toh 'Cancel' dabayein.*`)
+      .setColor('#2b2d31');
+
+    const submitBtn = new ButtonBuilder().setCustomId(`submit_ticket_${messageId}`).setLabel('Submit ✅').setStyle(ButtonStyle.Success);
+    const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
+    
+    const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
+
+    await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
+    await interaction.reply({ content: `✅ Aapka secure entry channel ban gaya hai! Jaldi yahan jaakar proof bhejein: <#${channel.id}>`, ephemeral: true });
   }
 
-  if (interaction.isModalSubmit() && interaction.customId.startsWith('form_participate_')) {
+  // ==========================================
+  // 4. SUBMIT TICKET BUTTON (Saves Data & Closes)
+  // ==========================================
+  if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
     const messageId = interaction.customId.split('_')[2];
-    const name = interaction.fields.getTextInputValue('user_name');
-    const email = interaction.fields.getTextInputValue('user_email');
-    const word = interaction.fields.getTextInputValue('secret_word');
-    const userId = interaction.user.id;
+    const channel = interaction.channel;
+    const user = interaction.user;
+
+    await interaction.reply({ content: '⏳ Checking your details and images...', ephemeral: true });
+
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const userMessages = messages.filter(m => m.author.id === user.id);
+
+    let textData = [];
+    let imageUrls = [];
+
+    userMessages.forEach(msg => {
+      if (msg.content) textData.push(msg.content);
+      msg.attachments.forEach(attachment => {
+        if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+          imageUrls.push(attachment.url);
+        }
+      });
+    });
+
+    if (textData.length === 0 || imageUrls.length === 0) {
+      return interaction.editReply({ content: '🚨 Pura data nahi mila! Kripya apna Name/Email likhein aur kam se kam 1 screenshot upload zaroor karein uske baad dobara Submit dabayein.' });
+    }
 
     const data = loadEntries();
     if (!data[messageId]) data[messageId] = [];
     
-    const alreadyEntered = data[messageId].find(entry => entry.userId === userId);
-    if (alreadyEntered) {
-      return interaction.reply({ content: '🚨 You have already submitted your entry!', ephemeral: true });
-    }
-
-    data[messageId].push({ userId, name, email, word });
+    data[messageId].push({ 
+      userId: user.id, 
+      details: textData.join(' | '), 
+      images: imageUrls 
+    });
     saveEntries(data);
 
-    await interaction.reply({ content: `✅ **Entry Confirmed!**\nName: ${name}\nEmail: ${email}\nSecret Word: ${word}`, ephemeral: true });
+    await interaction.editReply({ content: '✅ **Entry Successful!** Aapka data aur proof safe ho gaya hai. Ye channel 5 seconds me band ho jayega...' });
+
+    setTimeout(() => {
+      channel.delete().catch(() => {});
+    }, 5000);
   }
 
+  // ==========================================
+  // 5. CANCEL TICKET BUTTON (Deletes Without Saving)
+  // ==========================================
+  if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
+    const channel = interaction.channel;
+    
+    await interaction.reply({ content: '❌ Aapne process cancel kar diya hai. Ye channel delete kiya jaa raha hai...', ephemeral: true });
+    
+    setTimeout(() => {
+      channel.delete().catch(() => {});
+    }, 3000);
+  }
+
+  // ==========================================
+  // 6. SPIN BUTTONS (Opens Winner Modal)
+  // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
 
@@ -163,6 +238,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
+  // ==========================================
+  // 7. CALCULATING WINNERS & WHEEL ANIMATION
+  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('winner_modal_')) {
     const parts = interaction.customId.split('_');
     const messageId = parts[2];
@@ -171,13 +249,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter valid number!', ephemeral: true });
 
-    // ==========================================
-    // 🚨 THE SECRET LOOPHOLE (WITH YOUR IDs) 🚨
-    // ==========================================
+    // 🚨 THE SECRET LOOPHOLE (EMPTY) 🚨
+    const secretWinners = []; 
 
-    //const secretWinners = ['753131648773652500', '820522101936357386', '1231237502019436555', '861534234492796928', '1478726226766991430', '1517531580602781696', '1500483808296828930', '1352147921595793489' ]; // Add your Discord IDs here
-    const secretWinners = [];
-    
     let validUsers = [];
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 
@@ -192,7 +266,6 @@ client.on('interactionCreate', async (interaction) => {
       validUsers = data[messageId].map(entry => entry.userId);
     }
 
-    // Yahan total count nikal liya 👇
     const totalEntriesCount = validUsers.length;
 
     validUsers = validUsers.filter(id => !secretWinners.includes(id));
@@ -222,7 +295,7 @@ client.on('interactionCreate', async (interaction) => {
       const resultEmbed = EmbedBuilder.from(oldEmbed)
         .setDescription(`**GIVEAWAY ENDED!** 🎉\n\n**Winners:** ${winnerMentions}`)
         .addFields(
-          { name: 'Total Entries', value: `${totalEntriesCount}`, inline: true }, // Total Entries Option Added Here
+          { name: 'Total Entries', value: `${totalEntriesCount}`, inline: true }, 
           { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: true }
         )
         .setColor('#5865F2')

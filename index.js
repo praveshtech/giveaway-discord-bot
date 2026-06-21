@@ -124,7 +124,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. PARTICIPATE BUTTON
+  // 3. PARTICIPATE BUTTON (With Admin Immunity)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     const user = interaction.user;
@@ -132,7 +132,9 @@ client.on('interactionCreate', async (interaction) => {
     const messageId = interaction.message.id;
 
     const data = loadEntries();
-    if (data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
+    
+    // 🌟 ADMIN IMMUNITY: 'pravesh_kumar1' ko Anti-Spam check bypass milega 🌟
+    if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
       return interaction.reply({ content: '🚨 You have already submitted your entry for this giveaway!', ephemeral: true });
     }
 
@@ -208,7 +210,6 @@ client.on('interactionCreate', async (interaction) => {
       data[messageId].push({ userId: user.id });
       saveEntries(data);
 
-      // 🌟 DYNAMIC HTML TRANSCRIPT BANANA 🌟 (Dark Mode Theme)
       const htmlContent = `
       <!DOCTYPE html>
       <html lang="en">
@@ -243,11 +244,9 @@ client.on('interactionCreate', async (interaction) => {
       </html>
       `;
 
-      // HTML String ko ek asli File (.html) me convert karna
       const buffer = Buffer.from(htmlContent, 'utf-8');
       const attachment = new AttachmentBuilder(buffer, { name: `transcript_${user.username}.html` });
 
-      // Log channel me bas ek chota sa message aur file bhejna
       await logChannel.send({ 
         content: `📄 **New Verified Entry by:** <@${user.id}>`,
         files: [attachment]

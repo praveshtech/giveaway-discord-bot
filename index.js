@@ -163,33 +163,15 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
 
   // ==========================================
-  // 1. COMMAND: /clearentries (Database Reset + Chat Purge)
+  // 1. COMMAND: /clearentries (Database Reset)
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
     }
 
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
-      // 1. Backend database delete
-      saveEntries({});
-
-      // 2. Log Channel se purane messages delete
-      const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
-      if (logChannel) {
-        const messages = await logChannel.messages.fetch({ limit: 100 });
-        if (messages.size > 0) {
-          await logChannel.bulkDelete(messages, true); // True zaroori hai purane messages delete karne ke liye
-        }
-      }
-
-      return interaction.editReply({ content: '🗑️ **Success!** Database is clean AND all old PDFs have been removed from the entry channel! ✅' });
-    } catch (error) {
-      console.error(error);
-      return interaction.editReply({ content: '✅ Database cleared, but could not delete old messages. (Messages older than 14 days cannot be auto-deleted by Discord API).' });
-    }
+    saveEntries({});
+    return interaction.reply({ content: '🗑️ **Success!** All previous giveaway entries have been deleted. Database is now clean and ready for the next giveaway! ✅', ephemeral: true });
   }
 
   // ==========================================
@@ -203,7 +185,7 @@ client.on('interactionCreate', async (interaction) => {
     const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
 
-    const formattedRules = rawRulesInput ? `**📜 Rules:**\n${rawRulesInput.replace(/\\n/g, '\n')}\n\n` : '';
+    const formattedRules = rawRulesInput ? `\u200B\n### 📜 Rules:\n\n**${rawRulesInput.replace(/\\n/g, '\n\n')}**\n\n` : '\u200B\n';
 
     const embed = new EmbedBuilder()
       .setTitle(`🎉 ${prize}`)
@@ -230,7 +212,7 @@ client.on('interactionCreate', async (interaction) => {
     const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
 
-    const formattedRules = rawRulesInput ? `**📜 Rules:**\n${rawRulesInput.replace(/\\n/g, '\n')}\n\n` : '';
+    const formattedRules = rawRulesInput ? `\u200B\n### 📜 Rules:\n\n**${rawRulesInput.replace(/\\n/g, '\n\n')}**\n\n` : '\u200B\n';
 
     const embed = new EmbedBuilder()
       .setTitle(`🎁 SPECIAL GIVEAWAY: ${prize}`)
@@ -260,7 +242,8 @@ client.on('interactionCreate', async (interaction) => {
 
       const data = loadEntries();
       
-      if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
+      // 🌟 YAHAN SE IMMUNITY HATA DI GAYI HAI 🌟
+      if (data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
         return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
       }
 
@@ -282,9 +265,10 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
+      // 🌟 TEXT SIZE INCREASED HERE 🌟
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
-        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n### 1️⃣ Step 1:\nClick the **Enter Details 📝** button below to fill out the form.\n\n\n### 2️⃣ Step 2:\nAfter submitting the form, upload your **screenshots** in this chat.\n\n\n*Click Cancel if you don't want to participate.*`)
+        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n## 1️⃣ Step 1:\n**Click the Enter Details 📝 button below to fill out the form.**\n\n## 2️⃣ Step 2:\n**After submitting the form, upload your screenshots in this chat.**\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
       const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
@@ -330,9 +314,10 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
+    // 🌟 TEXT SIZE INCREASED HERE 🌟
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
-      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\n\n**1. Subscribe To Night Trader YouTube Channel**\n\n**2. Comment On Latest Video**\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n## 📸 Next Step:\n\n### 1. Subscribe To Night Trader YouTube Channel\n\n### 2. Comment On Latest Video\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
       .addFields(
         { name: '👤 Name', value: name, inline: true },
         { name: '📧 Email', value: email, inline: true },
@@ -409,7 +394,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const dmEmbed = new EmbedBuilder()
           .setTitle('🎉 Giveaway Entry Confirmed!')
-          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully Submitted** \n\nKeep an eye on the **<#1513208232040988824>** server for the winner announcement. Best of luck! 🍀`)
+          .setDescription(`Hello <@${user.id}>,\n\nThank you for participating! Your entry has been **successfully Submitted** and your proofs have been securely recorded in our system.\n\nKeep an eye on the **<#1381521786629521419>** server for the winner announcement. Best of luck! 🍀`)
           .setColor('#2ecc71')
           .setFooter({ text: 'Night Trader Community' });
 

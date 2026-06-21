@@ -44,22 +44,13 @@ function saveEntries(data) {
 }
 
 // ==========================================
-// 🌟 PDF Generator Function (SINGLE CONTINUOUS PAGE FIX)
+// 🌟 PDF Generator Function (1 Image = 1 Page Fix)
 // ==========================================
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     
-    // 🌟 DYNAMIC HEIGHT LOGIC: 
-    // Basic details ke liye 400 height + Har photo ke liye 550 extra height
-    const calculatedHeight = 400 + (imageUrls.length * 550);
-    const docHeight = Math.max(calculatedHeight, 792); // Kam se kam A4 size rahega
-
-    // Ek hi lamba page banega bina kisi break ke
-    const doc = new PDFDocument({ 
-      margin: 40, 
-      size: [612, docHeight] // Width: 612, Height: Dynamic!
-    });
-    
+    // Standard A4 Size page
+    const doc = new PDFDocument({ margin: 40 }); 
     let buffers = [];
     
     doc.on('data', buffers.push.bind(buffers));
@@ -69,6 +60,7 @@ function generatePDFTranscript(user, textData, imageUrls) {
 
     const removeEmojis = (str) => str.replace(/[^\x00-\x7F]/g, "").trim();
 
+    // --- PAGE 1: USER DETAILS ---
     doc.fontSize(20).fillColor('#111111').text('Giveaway Entry Transcript', { align: 'center', underline: true });
     doc.moveDown(1.5);
 
@@ -82,25 +74,24 @@ function generatePDFTranscript(user, textData, imageUrls) {
 
     const cleanTextData = textData.map(line => removeEmojis(line));
     doc.fontSize(12).fillColor('#111111').text(cleanTextData.join('\n\n'));
-    doc.moveDown(2);
-
-    doc.fontSize(14).fillColor('#007bff').text('Uploaded Proofs (Screenshots):', { underline: true });
-    doc.moveDown(1);
-
+    
+    // --- NEXT PAGES: 1 IMAGE PER PAGE ---
     for (let i = 0; i < imageUrls.length; i++) {
       try {
         const response = await axios.get(imageUrls[i], { responseType: 'arraybuffer' });
         const imgBuffer = Buffer.from(response.data, 'binary');
         
-        doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
-        doc.moveDown(0.5);
+        // 🌟 HAR NAYI PHOTO KE LIYE NAYA PAGE BANEGA 🌟
+        doc.addPage();
         
-        // Image perfectly limit size ke sath yahi chipkegi, bina naya page add kiye
-        doc.image(imgBuffer, { fit: [450, 500], align: 'center' });
-        doc.moveDown(2);
-      } catch (err) {
-        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically]`);
+        doc.fontSize(14).fillColor('#007bff').text(`Proof Screenshot #${i + 1}:`, { underline: true });
         doc.moveDown(1);
+        
+        // Badi photo ko page par center me fit karega bina cut kiye
+        doc.image(imgBuffer, { fit: [500, 650], align: 'center' });
+      } catch (err) {
+        doc.addPage();
+        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically. Link: ${imageUrls[i]}]`);
       }
     }
 

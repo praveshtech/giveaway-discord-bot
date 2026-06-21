@@ -163,15 +163,33 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
 
   // ==========================================
-  // 1. COMMAND: /clearentries (Database Reset)
+  // 1. COMMAND: /clearentries (Database Reset + Chat Purge)
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
     }
 
-    saveEntries({});
-    return interaction.reply({ content: '🗑️ **Success!** All previous giveaway entries have been deleted. Database is now clean and ready for the next giveaway! ✅', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      // 1. Backend database delete
+      saveEntries({});
+
+      // 2. Log Channel se purane messages delete
+      const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+      if (logChannel) {
+        const messages = await logChannel.messages.fetch({ limit: 100 });
+        if (messages.size > 0) {
+          await logChannel.bulkDelete(messages, true); // True zaroori hai purane messages delete karne ke liye
+        }
+      }
+
+      return interaction.editReply({ content: '🗑️ **Success!** Database is clean AND all old PDFs have been removed from the entry channel! ✅' });
+    } catch (error) {
+      console.error(error);
+      return interaction.editReply({ content: '✅ Database cleared, but could not delete old messages. (Messages older than 14 days cannot be auto-deleted by Discord API).' });
+    }
   }
 
   // ==========================================
@@ -312,10 +330,9 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
-    // 🌟 YAHAN NEXT STEP KO UPDATE KIYA GAYA HAI 🌟
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
-      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\n**1.** Subscribe To Night Trader YouTube Channel\n**2.** Comment On Latest Video\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\n\n**1. Subscribe To Night Trader YouTube Channel**\n\n**2. Comment On Latest Video**\n\n**Complete these steps and upload the screenshots in this chat.**\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
       .addFields(
         { name: '👤 Name', value: name, inline: true },
         { name: '📧 Email', value: email, inline: true },

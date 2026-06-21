@@ -120,7 +120,6 @@ client.once('ready', async () => {
         { name: 'rules', description: 'Rules for the giveaway', type: ApplicationCommandOptionType.String, required: false }
       ]
     },
-    // 🌟 NAYA COMMAND ADD KIYA GAYA HAI 🌟
     {
       name: 'clearentries',
       description: 'Delete all previous giveaway entries to start fresh'
@@ -171,7 +170,6 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
     }
 
-    // Database ko empty object se replace kar dega
     saveEntries({});
     return interaction.reply({ content: '🗑️ **Success!** All previous giveaway entries have been deleted. Database is now clean and ready for the next giveaway! ✅', ephemeral: true });
   }
@@ -184,12 +182,14 @@ client.on('interactionCreate', async (interaction) => {
 
     const prize = interaction.options.getString('prize');
     const durationMinutes = interaction.options.getInteger('duration');
-    const rawRules = interaction.options.getString('rules') || 'React with 🎁 below to secure your entry!';
+    const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
+
+    const formattedRules = rawRulesInput ? `**📜 Rules:**\n${rawRulesInput.replace(/\\n/g, '\n')}\n\n` : '';
 
     const embed = new EmbedBuilder()
       .setTitle(`🎉 ${prize}`)
-      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Waiting for the host to spin...*`)
+      .setDescription(`${formattedRules}**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Waiting for the host to spin...*`)
       .setColor('#2b2d31')
       .setFooter({ text: `Hosted by: ${interaction.user.username}` });
 
@@ -209,12 +209,14 @@ client.on('interactionCreate', async (interaction) => {
     const prize = interaction.options.getString('prize');
     const durationMinutes = interaction.options.getInteger('duration');
     const image = interaction.options.getAttachment('image');
-    const rawRules = interaction.options.getString('rules') || 'Click "Participate" to open your verification channel!';
+    const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
+
+    const formattedRules = rawRulesInput ? `**📜 Rules:**\n${rawRulesInput.replace(/\\n/g, '\n')}\n\n` : '';
 
     const embed = new EmbedBuilder()
       .setTitle(`🎁 SPECIAL GIVEAWAY: ${prize}`)
-      .setDescription(`${rawRules.replace(/\\n/g, '\n')}\n\n**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n*Hit the participate button to submit your details and screenshots!*`)
+      .setDescription(`${formattedRules}**Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:f>)\n\n**Hit the participate button to submit your details and screenshots!**`)
       .setImage(image.url)
       .setColor('#ff0000') 
       .setFooter({ text: `Hosted by: ${interaction.user.username}` });
@@ -262,9 +264,10 @@ client.on('interactionCreate', async (interaction) => {
         ]
       });
 
+      // 🌟 STEP 1 AND 2 SIZE AND SPACING INCREASED 🌟
       const embed = new EmbedBuilder()
         .setTitle('📝 Giveaway Verification Process')
-        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n**Step 1:** Click the **Enter Details 📝** button below to fill out the form.\n**Step 2:** After submitting the form, upload your screenshots in this chat.\n\n*Click Cancel if you don't want to participate.*`)
+        .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n### 1️⃣ Step 1:\nClick the **Enter Details 📝** button below to fill out the form.\n\n\n### 2️⃣ Step 2:\nAfter submitting the form, upload your **screenshots** in this chat.\n\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
       const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
@@ -310,9 +313,10 @@ client.on('interactionCreate', async (interaction) => {
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
 
+    // 🌟 NEXT STEP BADA AUR CLEAR KIYA 🌟
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')
-      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n**Next Step:**\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.). \nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
+      .setDescription(`Great <@${user.id}>! Your details are saved.\n\n### 📸 Next Step:\nPlease **upload your screenshots** in this chat (Subscribe, Comment, etc.).\n\nOnce all images are uploaded, the **Submit Final Entry ✅** button will turn Green.`)
       .addFields(
         { name: '👤 Name', value: name, inline: true },
         { name: '📧 Email', value: email, inline: true },

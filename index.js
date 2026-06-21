@@ -44,20 +44,13 @@ function saveEntries(data) {
 }
 
 // ==========================================
-// 🌟 PDF Generator Function (SINGLE CONTINUOUS PAGE FIX)
+// 🌟 PDF Generator Function
 // ==========================================
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     
-    // Basic details ke liye 400 height + Har photo ke liye 550 extra height
-    const calculatedHeight = 400 + (imageUrls.length * 550);
-    const docHeight = Math.max(calculatedHeight, 792); 
-
-    const doc = new PDFDocument({ 
-      margin: 40, 
-      size: [612, docHeight] 
-    });
-    
+    // Har image ke liye alag page (1 Image = 1 Page Logic)
+    const doc = new PDFDocument({ margin: 40 }); 
     let buffers = [];
     
     doc.on('data', buffers.push.bind(buffers));
@@ -67,6 +60,7 @@ function generatePDFTranscript(user, textData, imageUrls) {
 
     const removeEmojis = (str) => str.replace(/[^\x00-\x7F]/g, "").trim();
 
+    // --- PAGE 1: USER DETAILS ---
     doc.fontSize(20).fillColor('#111111').text('Giveaway Entry Transcript', { align: 'center', underline: true });
     doc.moveDown(1.5);
 
@@ -80,24 +74,22 @@ function generatePDFTranscript(user, textData, imageUrls) {
 
     const cleanTextData = textData.map(line => removeEmojis(line));
     doc.fontSize(12).fillColor('#111111').text(cleanTextData.join('\n\n'));
-    doc.moveDown(2);
-
-    doc.fontSize(14).fillColor('#007bff').text('Uploaded Proofs (Screenshots):', { underline: true });
-    doc.moveDown(1);
-
+    
+    // --- NEXT PAGES: 1 IMAGE PER PAGE ---
     for (let i = 0; i < imageUrls.length; i++) {
       try {
         const response = await axios.get(imageUrls[i], { responseType: 'arraybuffer' });
         const imgBuffer = Buffer.from(response.data, 'binary');
         
-        doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
-        doc.moveDown(0.5);
+        doc.addPage();
         
-        doc.image(imgBuffer, { fit: [450, 500], align: 'center' });
-        doc.moveDown(2);
-      } catch (err) {
-        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically]`);
+        doc.fontSize(14).fillColor('#007bff').text(`Proof Screenshot #${i + 1}:`, { underline: true });
         doc.moveDown(1);
+        
+        doc.image(imgBuffer, { fit: [500, 650], align: 'center' });
+      } catch (err) {
+        doc.addPage();
+        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically. Link: ${imageUrls[i]}]`);
       }
     }
 
@@ -127,9 +119,14 @@ client.once('ready', async () => {
         { name: 'image', description: 'Upload a Thumbnail Image', type: ApplicationCommandOptionType.Attachment, required: true },
         { name: 'rules', description: 'Rules for the giveaway', type: ApplicationCommandOptionType.String, required: false }
       ]
+    },
+    // 🌟 NAYA COMMAND ADD KIYA GAYA HAI 🌟
+    {
+      name: 'clearentries',
+      description: 'Delete all previous giveaway entries to start fresh'
     }
   ]);
-  console.log('✅ Commands /giveaway and /giveaway2 registered.');
+  console.log('✅ Commands /giveaway, /giveaway2 and /clearentries registered.');
 });
 
 // ==========================================
@@ -166,6 +163,22 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
 
+  // ==========================================
+  // 1. COMMAND: /clearentries (Database Reset)
+  // ==========================================
+  if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+      return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
+    }
+
+    // Database ko empty object se replace kar dega
+    saveEntries({});
+    return interaction.reply({ content: '🗑️ **Success!** All previous giveaway entries have been deleted. Database is now clean and ready for the next giveaway! ✅', ephemeral: true });
+  }
+
+  // ==========================================
+  // 2. COMMAND: /giveaway
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -187,6 +200,9 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
+  // ==========================================
+  // 3. COMMAND: /giveaway2
+  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -211,6 +227,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({ embeds: [embed], components: [row] });
   }
 
+  // ==========================================
+  // 4. MAIN PARTICIPATE BUTTON
+  // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
 
@@ -262,6 +281,9 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
+  // ==========================================
+  // 5. ENTER DETAILS BUTTON (Opens the Modal)
+  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('open_form_')) {
     const messageId = interaction.customId.split('_')[2];
     
@@ -278,6 +300,9 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
+  // ==========================================
+  // 6. MODAL SUBMIT
+  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('giveaway_modal_')) {
     const messageId = interaction.customId.split('_')[2];
     const name = interaction.fields.getTextInputValue('form_name');
@@ -304,7 +329,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 6. FINAL SUBMIT BUTTON (Generates PDF + Sends DM)
+  // 7. FINAL SUBMIT BUTTON (Generates PDF + DM)
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -360,7 +385,7 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.editReply({ content: '✅ **Entry Successful!** Your PDF transcript has been securely recorded. This channel will close in 5 seconds...' });
 
-      // 🌟 DM BHEJNE KA LOGIC 🌟
+      // DM User
       try {
         const dmEmbed = new EmbedBuilder()
           .setTitle('🎉 Giveaway Entry Confirmed!')
@@ -370,7 +395,7 @@ client.on('interactionCreate', async (interaction) => {
 
         await user.send({ embeds: [dmEmbed] });
       } catch (dmError) {
-        console.log(`Could not send DM to ${user.tag}. Unhone shayad DMs off kiye hue hain.`);
+        console.log(`Could not send DM to ${user.tag}.`);
       }
 
       setTimeout(() => {
@@ -383,12 +408,18 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
+  // ==========================================
+  // 8. CANCEL TICKET BUTTON
+  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
     const channel = interaction.channel;
     await interaction.reply({ content: '❌ You have canceled the process. This channel is being deleted...', ephemeral: true });
     setTimeout(() => { channel.delete().catch(() => {}); }, 3000);
   }
 
+  // ==========================================
+  // 9. SPIN BUTTONS & WINNER CALCULATION
+  // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
 

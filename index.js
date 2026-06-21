@@ -17,7 +17,6 @@ const {
   AttachmentBuilder 
 } = require('discord.js');
 
-// 🌟 PDF aur Image download ke liye naye modules import kiye hain
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 
@@ -46,7 +45,7 @@ function saveEntries(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
-// 🌟 FUNCTION: Ek clean PDF generate karne ka logic
+// 🌟 FUNCTION: PDF Transcript Generator
 function generatePDFTranscript(user, textData, imageUrls) {
   return new Promise(async (resolve) => {
     const doc = new PDFDocument({ margin: 40 });
@@ -57,27 +56,22 @@ function generatePDFTranscript(user, textData, imageUrls) {
       resolve(Buffer.concat(buffers));
     });
 
-    // Header Title
     doc.fontSize(22).fillColor('#111111').text('🎉 Giveaway Entry Transcript', { align: 'center' });
     doc.moveDown(1.5);
 
-    // User Profile Data
     doc.fontSize(12).fillColor('#333333').text(`Discord User: ${user.tag}`);
     doc.text(`User ID: ${user.id}`);
     doc.text(`Submitted Date: ${new Date().toLocaleString()}`);
     doc.moveDown(2);
 
-    // Form Text Details
     doc.fontSize(15).fillColor('#007bff').text('📝 Provided Details:', { underline: true });
     doc.moveDown(0.5);
     doc.fontSize(12).fillColor('#111111').text(textData.join('\n\n'));
     doc.moveDown(2);
 
-    // Screenshots Header
     doc.fontSize(15).fillColor('#007bff').text('📸 Uploaded Proofs (Screenshots):', { underline: true });
     doc.moveDown(1);
 
-    // Loop chala kar saari photos ko download karke PDF me insert karna
     for (let i = 0; i < imageUrls.length; i++) {
       try {
         const response = await axios.get(imageUrls[i], { responseType: 'arraybuffer' });
@@ -178,47 +172,59 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. PARTICIPATE BUTTON (With Admin Immunity)
+  // 3. PARTICIPATE BUTTON (With Timeout Fix)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
-    const user = interaction.user;
-    const guild = interaction.guild;
-    const messageId = interaction.message.id;
+    // 🌟 TURANT DEFER: Isse Discord 3 second wala timeout nahi dega!
+    await interaction.deferReply({ ephemeral: true });
 
-    const data = loadEntries();
-    
-    if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
-      return interaction.reply({ content: '🚨 You have already submitted your entry for this giveaway!', ephemeral: true });
+    try {
+      const user = interaction.user;
+      const guild = interaction.guild;
+      const messageId = interaction.message.id;
+
+      const data = loadEntries();
+      
+      if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
+        return interaction.editReply({ content: '🚨 You have already submitted your entry for this giveaway!' });
+      }
+
+      // 🌟 SAFE NAME: Channel name me emoji ya space allow nahi hote, isliye usko clean kiya
+      const safeUsername = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const channelName = `entry-${safeUsername}`;
+      
+      const existingChannel = guild.channels.cache.find(c => c.name === channelName);
+      if (existingChannel) {
+        return interaction.editReply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>` });
+      }
+
+      const channel = await guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
+          { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory] } 
+        ]
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle('📝 Giveaway Verification Process')
+        .setDescription(`Welcome <@${user.id}>! To secure your entry, please complete the following steps:\n\n**1️⃣ Provide Your Details:**\nSend your **Name, Email, and YouTube Secret Word** in a single message in this chat.\n\n**2️⃣ Upload Screenshots:**\n👉 Screenshot of subscribing to the NT YouTube Channel.\n👉 Screenshot of your comment on the video.\n👉 Other (Optional).\n\n*Once everything is uploaded, click 'Submit ✅'. If you wish to cancel, click 'Cancel ❌'.*`)
+        .setColor('#2b2d31');
+
+      const submitBtn = new ButtonBuilder().setCustomId(`submit_ticket_${messageId}`).setLabel('Submit ✅').setStyle(ButtonStyle.Success);
+      const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
+      
+      const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
+
+      await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
+      await interaction.editReply({ content: `✅ Your secure entry channel has been created! Please submit your proofs here: <#${channel.id}>` });
+
+    } catch (error) {
+      console.error("Participate Button Error: ", error);
+      await interaction.editReply({ content: '🚨 **Error!** Bot could not create the channel. Please ensure the bot has **"Manage Channels"** permission in Server Settings.' });
     }
-
-    const channelName = `entry-${user.username.toLowerCase()}`;
-    const existingChannel = guild.channels.cache.find(c => c.name === channelName);
-    if (existingChannel) {
-      return interaction.reply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>`, ephemeral: true });
-    }
-
-    const channel = await guild.channels.create({
-      name: channelName,
-      type: ChannelType.GuildText,
-      permissionOverwrites: [
-        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
-        { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory] } 
-      ]
-    });
-
-    const embed = new EmbedBuilder()
-      .setTitle('📝 Giveaway Verification Process')
-      .setDescription(`Welcome <@${user.id}>! To secure your entry, please complete the following steps:\n\n**1️⃣ Provide Your Details:**\nSend your **Name, Email, and YouTube Secret Word** in a single message in this chat.\n\n**2️⃣ Upload Screenshots:**\n👉 Screenshot of subscribing to the NT YouTube Channel.\n👉 Screenshot of your comment on the video.\n👉 Other (Optional).\n\n*Once everything is uploaded, click 'Submit ✅'. If you wish to cancel, click 'Cancel ❌'.*`)
-      .setColor('#2b2d31');
-
-    const submitBtn = new ButtonBuilder().setCustomId(`submit_ticket_${messageId}`).setLabel('Submit ✅').setStyle(ButtonStyle.Success);
-    const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
-    
-    const row = new ActionRowBuilder().addComponents(submitBtn, cancelBtn);
-
-    await channel.send({ content: `<@${user.id}>`, embeds: [embed], components: [row] });
-    await interaction.reply({ content: `✅ Your secure entry channel has been created! Please submit your proofs here: <#${channel.id}>`, ephemeral: true });
   }
 
   // ==========================================
@@ -262,11 +268,9 @@ client.on('interactionCreate', async (interaction) => {
       data[messageId].push({ userId: user.id });
       saveEntries(data);
 
-      // 🌟 PDF Buffer generate karna function call karke
       const pdfBuffer = await generatePDFTranscript(user, textData, imageUrls);
       const attachment = new AttachmentBuilder(pdfBuffer, { name: `transcript_${user.username}.pdf` });
 
-      // Clean look ke sath log channel me bhej dena
       await logChannel.send({ 
         content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})`,
         files: [attachment]

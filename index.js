@@ -17,6 +17,10 @@ const {
   AttachmentBuilder 
 } = require('discord.js');
 
+// 🌟 PDF aur Image download ke liye naye modules import kiye hain
+const PDFDocument = require('pdfkit');
+const axios = require('axios');
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -29,7 +33,6 @@ const client = new Client({
 // ==========================================
 // ⚙️ CONFIGURATION (CHANNEL ID SETTING)
 // ==========================================
-// Aapke 'giveaways-entry' channel ki ID 👇
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
 
@@ -41,6 +44,57 @@ function loadEntries() {
 }
 function saveEntries(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
+
+// 🌟 FUNCTION: Ek clean PDF generate karne ka logic
+function generatePDFTranscript(user, textData, imageUrls) {
+  return new Promise(async (resolve) => {
+    const doc = new PDFDocument({ margin: 40 });
+    let buffers = [];
+    
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      resolve(Buffer.concat(buffers));
+    });
+
+    // Header Title
+    doc.fontSize(22).fillColor('#111111').text('🎉 Giveaway Entry Transcript', { align: 'center' });
+    doc.moveDown(1.5);
+
+    // User Profile Data
+    doc.fontSize(12).fillColor('#333333').text(`Discord User: ${user.tag}`);
+    doc.text(`User ID: ${user.id}`);
+    doc.text(`Submitted Date: ${new Date().toLocaleString()}`);
+    doc.moveDown(2);
+
+    // Form Text Details
+    doc.fontSize(15).fillColor('#007bff').text('📝 Provided Details:', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor('#111111').text(textData.join('\n\n'));
+    doc.moveDown(2);
+
+    // Screenshots Header
+    doc.fontSize(15).fillColor('#007bff').text('📸 Uploaded Proofs (Screenshots):', { underline: true });
+    doc.moveDown(1);
+
+    // Loop chala kar saari photos ko download karke PDF me insert karna
+    for (let i = 0; i < imageUrls.length; i++) {
+      try {
+        const response = await axios.get(imageUrls[i], { responseType: 'arraybuffer' });
+        const imgBuffer = Buffer.from(response.data, 'binary');
+        
+        doc.fontSize(11).fillColor('#555555').text(`Proof Screenshot #${i + 1}:`);
+        doc.moveDown(0.5);
+        doc.image(imgBuffer, { fit: [450, 350], align: 'center' });
+        doc.moveDown(2);
+      } catch (err) {
+        doc.fontSize(11).fillColor('red').text(`[Could not embed screenshot #${i + 1} automatically. Link: ${imageUrls[i]}]`);
+        doc.moveDown(1);
+      }
+    }
+
+    doc.end();
+  });
 }
 
 client.once('ready', async () => {
@@ -133,7 +187,6 @@ client.on('interactionCreate', async (interaction) => {
 
     const data = loadEntries();
     
-    // 🌟 ADMIN IMMUNITY: 'pravesh_kumar1' ko Anti-Spam check bypass milega 🌟
     if (user.username !== 'pravesh_kumar1' && data[messageId] && data[messageId].find(entry => entry.userId === user.id)) {
       return interaction.reply({ content: '🚨 You have already submitted your entry for this giveaway!', ephemeral: true });
     }
@@ -169,7 +222,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. SUBMIT TICKET BUTTON (Transcript File Logic)
+  // 4. SUBMIT TICKET BUTTON (Generates PDF File)
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_ticket_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -182,7 +235,7 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ content: '🚨 Setup Error: Entry log channel not found! Please verify the **LOG_CHANNEL_ID** inside your `index.js` file.', ephemeral: true });
     }
 
-    await interaction.reply({ content: '⏳ Checking your details and images...', ephemeral: true });
+    await interaction.reply({ content: '⏳ Checking your details and processing PDF transcript...', ephemeral: true });
 
     const messages = await channel.messages.fetch({ limit: 50 });
     const userMessages = messages.filter(m => m.author.id === user.id);
@@ -204,63 +257,30 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     try {
-      // Background me ID save karna spin wheel ke liye
       const data = loadEntries();
       if (!data[messageId]) data[messageId] = [];
       data[messageId].push({ userId: user.id });
       saveEntries(data);
 
-      const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Giveaway Entry - ${user.tag}</title>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #313338; color: #dbdee1; padding: 20px; }
-          .box { background-color: #2b2d31; padding: 25px; border-radius: 8px; max-width: 700px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-          h2 { color: #f2f3f5; border-bottom: 2px solid #1e1f22; padding-bottom: 10px; margin-top: 0; }
-          .info { background: #1e1f22; padding: 15px; border-radius: 6px; font-size: 16px; margin-bottom: 20px; white-space: pre-wrap; word-wrap: break-word;}
-          .images img { max-width: 100%; border-radius: 8px; margin-bottom: 15px; border: 2px solid #1e1f22; }
-          .footer { text-align: center; font-size: 12px; color: #80848e; margin-top: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="box">
-          <h2>🎁 Giveaway Entry Transcript</h2>
-          <p><strong>Discord User:</strong> ${user.tag} (ID: ${user.id})</p>
-          
-          <h3>📝 Details Provided:</h3>
-          <div class="info">${textData.join('\n')}</div>
-          
-          <h3>📸 Uploaded Screenshots:</h3>
-          <div class="images">
-            ${imageUrls.map(url => `<a href="${url}" target="_blank"><img src="${url}" alt="User Proof"></a>`).join('<br>')}
-          </div>
-        </div>
-        <div class="footer">Generated by NT Giveaway Bot</div>
-      </body>
-      </html>
-      `;
+      // 🌟 PDF Buffer generate karna function call karke
+      const pdfBuffer = await generatePDFTranscript(user, textData, imageUrls);
+      const attachment = new AttachmentBuilder(pdfBuffer, { name: `transcript_${user.username}.pdf` });
 
-      const buffer = Buffer.from(htmlContent, 'utf-8');
-      const attachment = new AttachmentBuilder(buffer, { name: `transcript_${user.username}.html` });
-
+      // Clean look ke sath log channel me bhej dena
       await logChannel.send({ 
-        content: `📄 **New Verified Entry by:** <@${user.id}>`,
+        content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})`,
         files: [attachment]
       });
 
-      await interaction.editReply({ content: '✅ **Entry Successful!** Your details and proofs have been safely recorded. This channel will close in 5 seconds...' });
+      await interaction.editReply({ content: '✅ **Entry Successful!** Your PDF transcript has been securely recorded. This channel will close in 5 seconds...' });
 
       setTimeout(() => {
         channel.delete().catch(() => {});
       }, 5000);
 
     } catch (error) {
-      console.error("Transcript Error:", error);
-      await interaction.editReply({ content: '🚨 **Error!** Bot could not send the transcript. Please ensure it has `Send Messages` and `Attach Files` permissions.' });
+      console.error("PDF Transcript Error:", error);
+      await interaction.editReply({ content: '🚨 **Error!** Bot could not generate or send the PDF transcript. Please ensure the bot has permission to attach files.' });
     }
   }
 
@@ -365,5 +385,7 @@ client.on('interactionCreate', async (interaction) => {
     }, 4000);
   }
 });
+
+client.on('error', console.error);
 
 client.login(process.env.BOT_TOKEN);

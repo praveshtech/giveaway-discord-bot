@@ -142,7 +142,6 @@ client.once('ready', async () => {
   setInterval(async () => {
     try {
       client.guilds.cache.forEach(async (guild) => {
-        // Sirf ticket channels filter karo
         const entryChannels = guild.channels.cache.filter(c => c.name.startsWith('entry-') && c.type === ChannelType.GuildText);
         
         entryChannels.forEach(async (channel) => {
@@ -150,24 +149,22 @@ client.once('ready', async () => {
             const messages = await channel.messages.fetch({ limit: 1 });
             const lastMessage = messages.first();
             
-            // Agar message hai toh uska time lo, warna channel creation time lo
             const lastActivityTime = lastMessage ? lastMessage.createdAt.getTime() : channel.createdTimestamp;
             const timeDiffMinutes = (Date.now() - lastActivityTime) / (1000 * 60);
 
-            // Agar 10 minute se zyada ho gaye hain toh Delete maar do
             if (timeDiffMinutes >= 10) {
               console.log(`🗑️ Auto-deleting inactive channel: ${channel.name}`);
               await channel.delete().catch(() => {});
             }
           } catch (err) {
-            // Ignore error if channel is already deleted
+            // Ignore error
           }
         });
       });
     } catch (err) {
       console.error("Auto-cleanup error:", err);
     }
-  }, 2 * 60 * 1000); // Har 2 minute me background me check karega
+  }, 2 * 60 * 1000); 
   console.log('🧹 Inactivity Auto-Sweeper Started (10 mins limit).');
 });
 
@@ -243,7 +240,7 @@ client.on('interactionCreate', async (interaction) => {
           }
         }
         
-        return interaction.editReply({ content: `🗑️ **Success!** Deleted ${entryCount} database entries AND ${deletedPDFs} PDF logs for Giveaway ID: **${targetMessageId}**. Aapka active giveaway ekdum safe hai! ✅` });
+        return interaction.editReply({ content: `🗑️ **Success!** Deleted ${entryCount} database entries AND ${deletedPDFs} PDF logs for Giveaway ID: **${targetMessageId}**. ✅` });
       } else {
         return interaction.editReply({ content: `⚠️ No entries found for Message ID: **${targetMessageId}**.` });
       }
@@ -280,7 +277,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. COMMAND: /giveaway2 (Dynamic Word Input System)
+  // 3. COMMAND: /giveaway2 
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
@@ -314,7 +311,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. MAIN PARTICIPATE BUTTON (Auto-Scaling Category)
+  // 4. MAIN PARTICIPATE BUTTON 
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
@@ -338,7 +335,6 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>` });
       }
 
-      // 🌟 MAGIC: AUTO-SCALING CATEGORY BYPASSES 50 CHANNEL LIMIT 🌟
       const baseCategoryName = '🎫 Giveaway Tickets';
       
       let category = guild.channels.cache.find(c => c.name.startsWith(baseCategoryName) && c.type === ChannelType.GuildCategory && c.children.cache.size < 48);
@@ -387,12 +383,12 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("Participate Button Error: ", error);
-      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel. (Check terminal logs for exact Discord issue).' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel.' });
     }
   }
 
   // ==========================================
-  // 5. ENTER DETAILS BUTTON (Opens the Modal)
+  // 5. ENTER DETAILS BUTTON
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('open_form_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -448,7 +444,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 7. FINAL SUBMIT BUTTON (Generates PDF, saves Word + DM)
+  // 7. FINAL SUBMIT BUTTON 
   // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -542,7 +538,19 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 9. SPIN BUTTONS & WINNER CALCULATION
+  // 9. LOCK & END FINAL BUTTON 🔒
+  // ==========================================
+  if (interaction.isButton() && interaction.customId === 'lock_giveaway_final') {
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can lock the giveaway!', ephemeral: true });
+
+    await interaction.reply({ content: '🔒 Giveaway has been permanently locked!', ephemeral: true });
+    
+    // Message se saare buttons remove kar dega
+    await interaction.message.edit({ components: [] });
+  }
+
+  // ==========================================
+  // 10. SPIN BUTTONS & WINNER CALCULATION (WITH RE-ROLL & LOCK)
   // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
@@ -631,7 +639,20 @@ client.on('interactionCreate', async (interaction) => {
         .setColor('#5865F2')
         .setImage(null); 
 
-      await giveawayMessage.edit({ embeds: [resultEmbed], components: [] });
+      // 🌟 YAHAN RE-ROLL AUR LOCK BUTTONS LAGAYE GAYE HAIN 🌟
+      const rerunBtn = new ButtonBuilder()
+        .setCustomId(spinType) 
+        .setLabel('Re-Roll / Spin Again 🎰')
+        .setStyle(ButtonStyle.Primary);
+        
+      const lockBtn = new ButtonBuilder()
+        .setCustomId('lock_giveaway_final')
+        .setLabel('Lock & End 🔒')
+        .setStyle(ButtonStyle.Secondary);
+
+      const endRow = new ActionRowBuilder().addComponents(rerunBtn, lockBtn);
+
+      await giveawayMessage.edit({ embeds: [resultEmbed], components: [endRow] });
       await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**! (Correct Code Verified ✅)`);
     }, 4000);
   }

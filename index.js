@@ -137,7 +137,7 @@ client.once('ready', async () => {
   console.log('✅ Commands registered with dynamic secret word option.');
 
   // ==========================================
-  // 🧹 20-MIN INACTIVITY AUTO-SWEEPER 🧹
+  // 🧹 10-MIN INACTIVITY AUTO-SWEEPER 🧹
   // ==========================================
   setInterval(async () => {
     try {
@@ -154,8 +154,8 @@ client.once('ready', async () => {
             const lastActivityTime = lastMessage ? lastMessage.createdAt.getTime() : channel.createdTimestamp;
             const timeDiffMinutes = (Date.now() - lastActivityTime) / (1000 * 60);
 
-            // Agar 20 minute se zyada ho gaye hain toh Delete maar do
-            if (timeDiffMinutes >= 20) {
+            // Agar 10 minute se zyada ho gaye hain toh Delete maar do
+            if (timeDiffMinutes >= 10) {
               console.log(`🗑️ Auto-deleting inactive channel: ${channel.name}`);
               await channel.delete().catch(() => {});
             }
@@ -167,8 +167,8 @@ client.once('ready', async () => {
     } catch (err) {
       console.error("Auto-cleanup error:", err);
     }
-  }, 5 * 60 * 1000); // Har 5 minute me background me check karega
-  console.log('🧹 Inactivity Auto-Sweeper Started (20 mins limit).');
+  }, 2 * 60 * 1000); // Har 2 minute me background me check karega
+  console.log('🧹 Inactivity Auto-Sweeper Started (10 mins limit).');
 });
 
 // ==========================================

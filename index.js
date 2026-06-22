@@ -280,7 +280,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. MAIN PARTICIPATE BUTTON
+  // 4. MAIN PARTICIPATE BUTTON (Auto-Scaling Category)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
@@ -304,12 +304,19 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply({ content: `🚨 Your verification channel is already open here: <#${existingChannel.id}>` });
       }
 
-      const categoryName = '🎫 Giveaway Tickets';
-      let category = guild.channels.cache.find(c => c.name === categoryName && c.type === ChannelType.GuildCategory);
+      // 🌟 MAGIC: AUTO-SCALING CATEGORY BYPASSES 50 CHANNEL LIMIT 🌟
+      const baseCategoryName = '🎫 Giveaway Tickets';
       
+      // Aisi category dhundo jisme 48 se kam channels hon (safe limit)
+      let category = guild.channels.cache.find(c => c.name.startsWith(baseCategoryName) && c.type === ChannelType.GuildCategory && c.children.cache.size < 48);
+      
+      // Agar saari categories full ho gayi hain, toh nayi category banao
       if (!category) {
+        const categoryCount = guild.channels.cache.filter(c => c.name.startsWith(baseCategoryName) && c.type === ChannelType.GuildCategory).size;
+        const newCategoryName = categoryCount === 0 ? baseCategoryName : `${baseCategoryName} ${categoryCount + 1}`;
+        
         category = await guild.channels.create({
-          name: categoryName,
+          name: newCategoryName,
           type: ChannelType.GuildCategory,
           permissionOverwrites: [
             { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
@@ -324,8 +331,12 @@ client.on('interactionCreate', async (interaction) => {
         parent: category.id, 
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-          { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
-          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory] } 
+          { 
+            id: user.id, 
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory],
+            deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] 
+          }, 
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.ManageRoles] } 
         ]
       });
 
@@ -344,7 +355,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("Participate Button Error: ", error);
-      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel. (Check terminal logs for exact Discord issue).' });
     }
   }
 
@@ -376,6 +387,15 @@ client.on('interactionCreate', async (interaction) => {
     const email = interaction.fields.getTextInputValue('form_email');
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
+
+    try {
+      await interaction.channel.permissionOverwrites.edit(user.id, {
+        SendMessages: true,
+        AttachFiles: true
+      });
+    } catch (err) {
+      console.log("Permissions update me error: ", err);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')

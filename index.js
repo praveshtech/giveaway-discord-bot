@@ -135,6 +135,40 @@ client.once('ready', async () => {
     }
   ]);
   console.log('✅ Commands registered with dynamic secret word option.');
+
+  // ==========================================
+  // 🧹 20-MIN INACTIVITY AUTO-SWEEPER 🧹
+  // ==========================================
+  setInterval(async () => {
+    try {
+      client.guilds.cache.forEach(async (guild) => {
+        // Sirf ticket channels filter karo
+        const entryChannels = guild.channels.cache.filter(c => c.name.startsWith('entry-') && c.type === ChannelType.GuildText);
+        
+        entryChannels.forEach(async (channel) => {
+          try {
+            const messages = await channel.messages.fetch({ limit: 1 });
+            const lastMessage = messages.first();
+            
+            // Agar message hai toh uska time lo, warna channel creation time lo
+            const lastActivityTime = lastMessage ? lastMessage.createdAt.getTime() : channel.createdTimestamp;
+            const timeDiffMinutes = (Date.now() - lastActivityTime) / (1000 * 60);
+
+            // Agar 20 minute se zyada ho gaye hain toh Delete maar do
+            if (timeDiffMinutes >= 20) {
+              console.log(`🗑️ Auto-deleting inactive channel: ${channel.name}`);
+              await channel.delete().catch(() => {});
+            }
+          } catch (err) {
+            // Ignore error if channel is already deleted
+          }
+        });
+      });
+    } catch (err) {
+      console.error("Auto-cleanup error:", err);
+    }
+  }, 5 * 60 * 1000); // Har 5 minute me background me check karega
+  console.log('🧹 Inactivity Auto-Sweeper Started (20 mins limit).');
 });
 
 // ==========================================
@@ -307,10 +341,8 @@ client.on('interactionCreate', async (interaction) => {
       // 🌟 MAGIC: AUTO-SCALING CATEGORY BYPASSES 50 CHANNEL LIMIT 🌟
       const baseCategoryName = '🎫 Giveaway Tickets';
       
-      // Aisi category dhundo jisme 48 se kam channels hon (safe limit)
       let category = guild.channels.cache.find(c => c.name.startsWith(baseCategoryName) && c.type === ChannelType.GuildCategory && c.children.cache.size < 48);
       
-      // Agar saari categories full ho gayi hain, toh nayi category banao
       if (!category) {
         const categoryCount = guild.channels.cache.filter(c => c.name.startsWith(baseCategoryName) && c.type === ChannelType.GuildCategory).size;
         const newCategoryName = categoryCount === 0 ? baseCategoryName : `${baseCategoryName} ${categoryCount + 1}`;

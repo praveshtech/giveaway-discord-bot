@@ -34,7 +34,7 @@ const client = new Client({
 // ==========================================
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
-// 👇 LIVE GIVEAWAY KE LIYE FALLBACK CODE (AGAR NEED HO) 👇
+// 👇 LIVE GIVEAWAY KE LIYE FALLBACK CODE 👇
 const CORRECT_SECRET_WORD = 'AHPLA'; 
 
 const dbPath = path.join(__dirname, 'entries.json');
@@ -117,7 +117,7 @@ client.once('ready', async () => {
         { name: 'prize', description: 'Prize Name', type: ApplicationCommandOptionType.String, required: true },
         { name: 'duration', description: 'Time in MINUTES', type: ApplicationCommandOptionType.Integer, required: true },
         { name: 'image', description: 'Upload a Thumbnail Image', type: ApplicationCommandOptionType.Attachment, required: true },
-        { name: 'secret_word', description: 'YouTube Secret Word for this giveaway', type: ApplicationCommandOptionType.String, required: true }, // 🌟 Naya mandatory option daala hai
+        { name: 'secret_word', description: 'YouTube Secret Word for this giveaway', type: ApplicationCommandOptionType.String, required: true },
         { name: 'rules', description: 'Rules for the giveaway', type: ApplicationCommandOptionType.String, required: false }
       ]
     },
@@ -190,7 +190,7 @@ client.on('interactionCreate', async (interaction) => {
         const userIdsInGiveaway = data[targetMessageId].map(e => e.userId);
         
         delete data[targetMessageId]; 
-        delete data[`secret_${targetMessageId}`]; // 🌟 Secret word ki meta key bhi delete ho jayegi
+        delete data[`secret_${targetMessageId}`]; 
         saveEntries(data);
         
         const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
@@ -254,7 +254,7 @@ client.on('interactionCreate', async (interaction) => {
     const prize = interaction.options.getString('prize');
     const durationMinutes = interaction.options.getInteger('duration');
     const image = interaction.options.getAttachment('image');
-    const secretWordInput = interaction.options.getString('secret_word'); // 🌟 Capture input word
+    const secretWordInput = interaction.options.getString('secret_word'); 
     const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
 
@@ -272,9 +272,8 @@ client.on('interactionCreate', async (interaction) => {
     
     const row = new ActionRowBuilder().addComponents(participateBtn, spinBtn);
 
-    const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }); // fetchReply true kiya hai target ID nikalne ke liye
+    const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }); 
 
-    // 🌟 Word ko database me is specific message ke liye link karke save karna 🌟
     const data = loadEntries();
     data[`secret_${msg.id}`] = secretWordInput.toLowerCase().replace(/\s+/g, '');
     saveEntries(data);
@@ -335,7 +334,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n## 1️⃣ Step 1:\n**Click the Enter Details 📝 button below to fill out the form.**\n\n## 2️⃣ Step 2:\n**After submitting the form, upload your screenshots in this chat.**\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
-      const formBtn = new ButtonBuilder().setCustomId suicide = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
+      const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
       const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
       
       const row = new ActionRowBuilder().addComponents(formBtn, cancelBtn);
@@ -537,7 +536,6 @@ client.on('interactionCreate', async (interaction) => {
       
       totalEntriesCount = data[messageId].length; 
       
-      // 🌟 DYNAMICALLY FETCH ASSIGNED SECRET WORD (FALLBACK TO TOP CONSTANT IF OLD UNIQUE POST) 🌟
       const masterCode = data[`secret_${messageId}`] || CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
       const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
       

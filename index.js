@@ -30,12 +30,12 @@ const client = new Client({
 });
 
 // ==========================================
-// ⚙️ CONFIGURATION (YAHAN APNA SECRET CODE DAALEIN)
+// ⚙️ CONFIGURATION
 // ==========================================
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
-// 👇 AAJ KE GIVEAWAY KA SAHI CODE  👇
-const CORRECT_SECRET_WORD = 'AHPLA'; // Ise lowercase me likhna best hai
+// 👇 LIVE GIVEAWAY KE LIYE FALLBACK CODE (AGAR NEED HO) 👇
+const CORRECT_SECRET_WORD = 'AHPLA'; 
 
 const dbPath = path.join(__dirname, 'entries.json');
 function loadEntries() {
@@ -117,6 +117,7 @@ client.once('ready', async () => {
         { name: 'prize', description: 'Prize Name', type: ApplicationCommandOptionType.String, required: true },
         { name: 'duration', description: 'Time in MINUTES', type: ApplicationCommandOptionType.Integer, required: true },
         { name: 'image', description: 'Upload a Thumbnail Image', type: ApplicationCommandOptionType.Attachment, required: true },
+        { name: 'secret_word', description: 'YouTube Secret Word for this giveaway', type: ApplicationCommandOptionType.String, required: true }, // 🌟 Naya mandatory option daala hai
         { name: 'rules', description: 'Rules for the giveaway', type: ApplicationCommandOptionType.String, required: false }
       ]
     },
@@ -133,7 +134,7 @@ client.once('ready', async () => {
       ]
     }
   ]);
-  console.log('✅ Commands /giveaway, /giveaway2 and /clearentries registered.');
+  console.log('✅ Commands registered with dynamic secret word option.');
 });
 
 // ==========================================
@@ -188,11 +189,10 @@ client.on('interactionCreate', async (interaction) => {
         const entryCount = data[targetMessageId].length;
         const userIdsInGiveaway = data[targetMessageId].map(e => e.userId);
         
-        // 1. Backend database se delete
         delete data[targetMessageId]; 
+        delete data[`secret_${targetMessageId}`]; // 🌟 Secret word ki meta key bhi delete ho jayegi
         saveEntries(data);
         
-        // 2. Log Channel se SMART PDF Deletion
         const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
         let deletedPDFs = 0;
         
@@ -200,7 +200,6 @@ client.on('interactionCreate', async (interaction) => {
           const messages = await logChannel.messages.fetch({ limit: 100 });
           
           const msgsToDelete = messages.filter(m => {
-            // Check karega agar log message me wo specific Giveaway ID hai ya purane format me target user ID hai
             return m.content.includes(targetMessageId) || userIdsInGiveaway.some(id => m.content.includes(`<@${id}>`));
           });
 
@@ -212,11 +211,11 @@ client.on('interactionCreate', async (interaction) => {
         
         return interaction.editReply({ content: `🗑️ **Success!** Deleted ${entryCount} database entries AND ${deletedPDFs} PDF logs for Giveaway ID: **${targetMessageId}**. Aapka active giveaway ekdum safe hai! ✅` });
       } else {
-        return interaction.editReply({ content: `⚠️ No entries found for Message ID: **${targetMessageId}**. Ya toh pehle hi delete ho chuka hai, ya ID galat hai.` });
+        return interaction.editReply({ content: `⚠️ No entries found for Message ID: **${targetMessageId}**.` });
       }
     } catch (error) {
       console.error(error);
-      return interaction.editReply({ content: '🚨 Delete process me error aayi. (Old messages cant be bulk deleted if older than 14 days)' });
+      return interaction.editReply({ content: '🚨 Delete process me error aayi.' });
     }
   }
 
@@ -247,7 +246,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 3. COMMAND: /giveaway2
+  // 3. COMMAND: /giveaway2 (Dynamic Word Input System)
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
@@ -255,6 +254,7 @@ client.on('interactionCreate', async (interaction) => {
     const prize = interaction.options.getString('prize');
     const durationMinutes = interaction.options.getInteger('duration');
     const image = interaction.options.getAttachment('image');
+    const secretWordInput = interaction.options.getString('secret_word'); // 🌟 Capture input word
     const rawRulesInput = interaction.options.getString('rules');
     const endTimestamp = Math.floor(Date.now() / 1000) + (durationMinutes * 60);
 
@@ -272,7 +272,12 @@ client.on('interactionCreate', async (interaction) => {
     
     const row = new ActionRowBuilder().addComponents(participateBtn, spinBtn);
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true }); // fetchReply true kiya hai target ID nikalne ke liye
+
+    // 🌟 Word ko database me is specific message ke liye link karke save karna 🌟
+    const data = loadEntries();
+    data[`secret_${msg.id}`] = secretWordInput.toLowerCase().replace(/\s+/g, '');
+    saveEntries(data);
   }
 
   // ==========================================
@@ -330,7 +335,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription(`Welcome <@${user.id}>! To secure your entry, follow these steps:\n\n## 1️⃣ Step 1:\n**Click the Enter Details 📝 button below to fill out the form.**\n\n## 2️⃣ Step 2:\n**After submitting the form, upload your screenshots in this chat.**\n\n*Click Cancel if you don't want to participate.*`)
         .setColor('#2b2d31');
 
-      const formBtn = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
+      const formBtn = new ButtonBuilder().setCustomId suicide = new ButtonBuilder().setCustomId(`open_form_${messageId}`).setLabel('Enter Details 📝').setStyle(ButtonStyle.Primary);
       const cancelBtn = new ButtonBuilder().setCustomId(`cancel_ticket_${messageId}`).setLabel('Cancel ❌').setStyle(ButtonStyle.Danger);
       
       const row = new ActionRowBuilder().addComponents(formBtn, cancelBtn);
@@ -340,7 +345,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("Participate Button Error: ", error);
-      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel. Please ensure the bot has **"Manage Channels"** permission.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel.' });
     }
   }
 
@@ -410,7 +415,7 @@ client.on('interactionCreate', async (interaction) => {
     const messages = await channel.messages.fetch({ limit: 50 });
     
     let textData = [];
-    let userSecretWord = ""; // User ne jo code daala wo store hoga
+    let userSecretWord = ""; 
     const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds[0]?.title === '✅ Details Saved! Now Upload Proofs');
     
     if (botMsg && botMsg.embeds.length > 0) {
@@ -447,7 +452,6 @@ client.on('interactionCreate', async (interaction) => {
       const pdfBuffer = await generatePDFTranscript(user, textData, imageUrls);
       const attachment = new AttachmentBuilder(pdfBuffer, { name: `transcript_${user.username}.pdf` });
 
-      // 🌟 YAHAN GIVEAWAY MESSAGE ID LOG CHANNEL ME BHEJ RAHE HAIN 🌟
       await logChannel.send({ 
         content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})\n🔑 Submitted Code: **${userSecretWord}**\n🎫 Giveaway ID: \`${messageId}\``,
         files: [attachment]
@@ -455,7 +459,6 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.editReply({ content: '✅ **Entry Successful!** Your PDF transcript has been securely recorded. This channel will close in 5 seconds...' });
 
-      // DM User
       try {
         const dmEmbed = new EmbedBuilder()
           .setTitle('🎉 Giveaway Entry Confirmed!')
@@ -474,7 +477,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("PDF Transcript Error:", error);
-      await interaction.editReply({ content: '🚨 **Error!** Could not generate or send the PDF. Ensure bot has attach file permissions.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not generate or send the PDF.' });
     }
   }
 
@@ -532,13 +535,14 @@ client.on('interactionCreate', async (interaction) => {
       const data = loadEntries();
       if (!data[messageId] || data[messageId].length === 0) return interaction.reply({ content: 'No one has submitted an entry yet!', ephemeral: true });
       
-      totalEntriesCount = data[messageId].length; // Total log jinhone form bhara
+      totalEntriesCount = data[messageId].length; 
       
-      const masterCode = CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
+      // 🌟 DYNAMICALLY FETCH ASSIGNED SECRET WORD (FALLBACK TO TOP CONSTANT IF OLD UNIQUE POST) 🌟
+      const masterCode = data[`secret_${messageId}`] || CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
       const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
       
       if (correctEntries.length === 0) {
-        return interaction.reply({ content: `🚨 Kisine bhi video dekhkar sahi code (**${CORRECT_SECRET_WORD}**) nahi dala hai! Koi winner nahi hai.`, ephemeral: true });
+        return interaction.reply({ content: `🚨 Kisine bhi sahi code (**${masterCode.toUpperCase()}**) nahi dala hai!`, ephemeral: true });
       }
       
       validUsers = correctEntries.map(entry => entry.userId);

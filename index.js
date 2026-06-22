@@ -122,7 +122,15 @@ client.once('ready', async () => {
     },
     {
       name: 'clearentries',
-      description: 'Delete all previous giveaway entries to start fresh'
+      description: 'Delete entries and PDFs for a specific giveaway',
+      options: [
+        { 
+          name: 'message_id', 
+          description: 'Paste the Message ID of the completed giveaway', 
+          type: ApplicationCommandOptionType.String, 
+          required: true 
+        }
+      ]
     }
   ]);
   console.log('✅ Commands /giveaway, /giveaway2 and /clearentries registered.');
@@ -163,28 +171,52 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
 
   // ==========================================
-  // 1. COMMAND: /clearentries
+  // 1. COMMAND: /clearentries (Smart Specific Delete)
   // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
     }
 
+    const targetMessageId = interaction.options.getString('message_id');
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      saveEntries({});
-      const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
-      if (logChannel) {
-        const messages = await logChannel.messages.fetch({ limit: 100 });
-        if (messages.size > 0) {
-          await logChannel.bulkDelete(messages, true);
+      const data = loadEntries();
+      
+      if (data[targetMessageId]) {
+        const entryCount = data[targetMessageId].length;
+        const userIdsInGiveaway = data[targetMessageId].map(e => e.userId);
+        
+        // 1. Backend database se delete
+        delete data[targetMessageId]; 
+        saveEntries(data);
+        
+        // 2. Log Channel se SMART PDF Deletion
+        const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+        let deletedPDFs = 0;
+        
+        if (logChannel) {
+          const messages = await logChannel.messages.fetch({ limit: 100 });
+          
+          const msgsToDelete = messages.filter(m => {
+            // Check karega agar log message me wo specific Giveaway ID hai ya purane format me target user ID hai
+            return m.content.includes(targetMessageId) || userIdsInGiveaway.some(id => m.content.includes(`<@${id}>`));
+          });
+
+          if (msgsToDelete.size > 0) {
+            await logChannel.bulkDelete(msgsToDelete, true);
+            deletedPDFs = msgsToDelete.size;
+          }
         }
+        
+        return interaction.editReply({ content: `🗑️ **Success!** Deleted ${entryCount} database entries AND ${deletedPDFs} PDF logs for Giveaway ID: **${targetMessageId}**. Aapka active giveaway ekdum safe hai! ✅` });
+      } else {
+        return interaction.editReply({ content: `⚠️ No entries found for Message ID: **${targetMessageId}**. Ya toh pehle hi delete ho chuka hai, ya ID galat hai.` });
       }
-      return interaction.editReply({ content: '🗑️ **Success!** Database is clean AND all old PDFs have been removed from the entry channel! ✅' });
     } catch (error) {
       console.error(error);
-      return interaction.editReply({ content: '✅ Database cleared, but could not delete old messages.' });
+      return interaction.editReply({ content: '🚨 Delete process me error aayi. (Old messages cant be bulk deleted if older than 14 days)' });
     }
   }
 
@@ -385,7 +417,6 @@ client.on('interactionCreate', async (interaction) => {
       botMsg.embeds[0].fields.forEach(f => {
         textData.push(`${f.name}: ${f.value}`);
         if (f.name === '🔑 Word') {
-          // Extra spaces ko remove kar ke normal format me karna
           userSecretWord = f.value.toLowerCase().replace(/\s+/g, ''); 
         }
       });
@@ -410,15 +441,15 @@ client.on('interactionCreate', async (interaction) => {
     try {
       const data = loadEntries();
       if (!data[messageId]) data[messageId] = [];
-      // 🌟 YAHAN DATABASE ME USER KI ID KE SATH USKA CODE BHI SAVE HO RAHA HAI 🌟
       data[messageId].push({ userId: user.id, secretWord: userSecretWord }); 
       saveEntries(data);
 
       const pdfBuffer = await generatePDFTranscript(user, textData, imageUrls);
       const attachment = new AttachmentBuilder(pdfBuffer, { name: `transcript_${user.username}.pdf` });
 
+      // 🌟 YAHAN GIVEAWAY MESSAGE ID LOG CHANNEL ME BHEJ RAHE HAIN 🌟
       await logChannel.send({ 
-        content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})\n🔑 Submitted Code: **${userSecretWord}**`,
+        content: `📄 **New Verified Entry by:** <@${user.id}> (${user.tag})\n🔑 Submitted Code: **${userSecretWord}**\n🎫 Giveaway ID: \`${messageId}\``,
         files: [attachment]
       });
 
@@ -503,7 +534,6 @@ client.on('interactionCreate', async (interaction) => {
       
       totalEntriesCount = data[messageId].length; // Total log jinhone form bhara
       
-      // 🌟 MAGIC: FILTER BY EXACT SECRET WORD 🌟
       const masterCode = CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
       const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
       

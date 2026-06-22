@@ -134,7 +134,7 @@ client.once('ready', async () => {
       ]
     }
   ]);
-  console.log('✅ Commands registered with dynamic secret word option.');
+  console.log('✅ Commands registered successfully.');
 });
 
 // ==========================================
@@ -280,7 +280,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 4. MAIN PARTICIPATE BUTTON
+  // 4. MAIN PARTICIPATE BUTTON (Create Locked Channel)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
@@ -318,14 +318,19 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
+      // 🌟 MAGIC: YAHAN USER KE LIYE SEND MESSAGES AUR ATTACH FILES INITIALLY OFF HAIN 🌟
       const channel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
         parent: category.id, 
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, 
-          { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.ReadMessageHistory] }, 
-          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory] } 
+          { 
+            id: user.id, 
+            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory],
+            deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles] // 🔒 Locked for user
+          }, 
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.ManageRoles] } 
         ]
       });
 
@@ -344,7 +349,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
       console.error("Participate Button Error: ", error);
-      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel.' });
+      await interaction.editReply({ content: '🚨 **Error!** Could not create the channel. Please check bot permissions.' });
     }
   }
 
@@ -368,7 +373,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 6. MODAL SUBMIT
+  // 6. MODAL SUBMIT (Unlock Channel)
   // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('giveaway_modal_')) {
     const messageId = interaction.customId.split('_')[2];
@@ -376,6 +381,16 @@ client.on('interactionCreate', async (interaction) => {
     const email = interaction.fields.getTextInputValue('form_email');
     const word = interaction.fields.getTextInputValue('form_word');
     const user = interaction.user;
+
+    // 🌟 MAGIC: FORM SUBMIT HOTE HI CHANNEL ME TYPING AUR IMAGE UPLOAD UNLOCK HO JAYEGA 🌟
+    try {
+      await interaction.channel.permissionOverwrites.edit(user.id, {
+        SendMessages: true,
+        AttachFiles: true
+      });
+    } catch (err) {
+      console.log("Permissions update me error: ", err);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('✅ Details Saved! Now Upload Proofs')

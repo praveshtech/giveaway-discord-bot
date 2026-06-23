@@ -585,10 +585,10 @@ client.on('interactionCreate', async (interaction) => {
 
   // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
 
-  secretWinners = []; 
+  secretWinners = ['1089883128300060683']; 
 
   } else if (spinType === 'spin_giveaway_2') {
-    
+
   // 📝 YouTube Word Giveaway (/giveaway2) ke secret winners yahan daalein (Jaise: ['ID3', 'ID4'])
 
   secretWinners = []; 

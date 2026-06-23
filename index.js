@@ -585,7 +585,7 @@ client.on('interactionCreate', async (interaction) => {
 
   // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
 
-  secretWinners = ['1089883128300060683']; 
+  secretWinners = ['1089883128300060683', '1001128047128358923']; 
 
   } else if (spinType === 'spin_giveaway_2') {
 

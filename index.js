@@ -550,7 +550,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 10. SPIN BUTTONS & WINNER CALCULATION (WITH RE-ROLL & LOCK)
+  // 10. SPIN BUTTONS & WINNER CALCULATION 
   // ==========================================
   if (interaction.isButton() && (interaction.customId === 'spin_giveaway_1' || interaction.customId === 'spin_giveaway_2')) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can spin!', ephemeral: true });
@@ -578,99 +578,114 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
+    // 🌟 MAGIC: IMMEDIATE REPLY TO AVOID TIMEOUT 🌟
+    await interaction.reply({ content: '🎰 Fetching all entries and preparing the spin wheel... Please wait!', ephemeral: true });
+
     // 👇 ALAG ALAG LOOPHOLE (SECRET WINNERS) 👇
-  let secretWinners = [];
-
-  if (spinType === 'spin_giveaway_1') {
-
-  // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
-
-  secretWinners = ['1089883128300060683', '1001128047128358923']; 
-
-  } else if (spinType === 'spin_giveaway_2') {
-
-  // 📝 YouTube Word Giveaway (/giveaway2) ke secret winners yahan daalein (Jaise: ['ID3', 'ID4'])
-
-  secretWinners = []; 
-  }
-  // 👆 ===================================== 👆
-
-  let validUsers = [];
-
-    let totalEntriesCount = 0;
-    const giveawayMessage = await interaction.channel.messages.fetch(messageId);
+    let secretWinners = [];
 
     if (spinType === 'spin_giveaway_1') {
-      const reaction = giveawayMessage.reactions.cache.get('🎁');
-      if (!reaction) return interaction.reply({ content: 'No entries yet!', ephemeral: true });
-      const users = await reaction.users.fetch();
-      validUsers = users.filter(user => !user.bot).map(user => user.id);
-      totalEntriesCount = validUsers.length;
-    } else {
-      const data = loadEntries();
-      if (!data[messageId] || data[messageId].length === 0) return interaction.reply({ content: 'No one has submitted an entry yet!', ephemeral: true });
-      
-      totalEntriesCount = data[messageId].length; 
-      
-      const masterCode = data[`secret_${messageId}`] || CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
-      const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
-      
-      if (correctEntries.length === 0) {
-        return interaction.reply({ content: `🚨 Kisine bhi sahi code (**${masterCode.toUpperCase()}**) nahi dala hai!`, ephemeral: true });
-      }
-      
-      validUsers = correctEntries.map(entry => entry.userId);
+      // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
+      secretWinners = ['1089883128300060683', '1001128047128358923']; 
+    } else if (spinType === 'spin_giveaway_2') {
+      // 📝 YouTube Word Giveaway (/giveaway2) ke secret winners yahan daalein (Jaise: ['ID3', 'ID4'])
+      secretWinners = []; 
     }
+    // 👆 ===================================== 👆
 
-    validUsers = validUsers.filter(id => !secretWinners.includes(id));
-    const shuffledEntries = validUsers.sort(() => 0.5 - Math.random());
-    const randomSpotsToFill = Math.max(0, winnerCount - secretWinners.length);
-    const randomWinners = shuffledEntries.slice(0, randomSpotsToFill);
+    let validUsers = [];
+    let totalEntriesCount = 0;
     
-    let finalWinners = [...secretWinners, ...randomWinners].sort(() => 0.5 - Math.random());
-    if (finalWinners.length === 0) return interaction.reply({ content: 'Not enough valid entries.', ephemeral: true });
+    try {
+      const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 
-    const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
-
-    await interaction.reply({ content: '🎰 Preparing the spin wheel...', ephemeral: true });
-    
-    const oldEmbed = giveawayMessage.embeds[0];
-    
-    const spinEmbed = new EmbedBuilder()
-      .setTitle(`🎰 SPINNING THE WHEEL FOR ${oldEmbed.title}...`)
-      .setImage('https://media.tenor.com/2Xk2v1rP4xgAAAAC/spin-wheel.gif') 
-      .setColor('#ffff00');
-
-    await giveawayMessage.edit({ embeds: [spinEmbed], components: [] });
-
-    setTimeout(async () => {
-      const endedTimestamp = Math.floor(Date.now() / 1000); 
-      
-      const resultEmbed = EmbedBuilder.from(oldEmbed)
-        .setDescription(`**GIVEAWAY ENDED!** 🎉\n\n**Winners:** ${winnerMentions}`)
-        .addFields(
-          { name: 'Total Valid Entries', value: `${validUsers.length} / ${totalEntriesCount}`, inline: true }, 
-          { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: true }
-        )
-        .setColor('#5865F2')
-        .setImage(null); 
-
-      // 🌟 YAHAN RE-ROLL AUR LOCK BUTTONS LAGAYE GAYE HAIN 🌟
-      const rerunBtn = new ButtonBuilder()
-        .setCustomId(spinType) 
-        .setLabel('Re-Roll / Spin Again 🎰')
-        .setStyle(ButtonStyle.Primary);
+      if (spinType === 'spin_giveaway_1') {
+        // 🌟 FIX 1: EMOJI UNICODE BYPASS 🌟
+        const reaction = giveawayMessage.reactions.cache.find(r => r.emoji.name === '🎁' || r.emoji.name.includes('🎁'));
+        if (!reaction) return interaction.editReply({ content: '🚨 No entries yet on the message!' });
         
-      const lockBtn = new ButtonBuilder()
-        .setCustomId('lock_giveaway_final')
-        .setLabel('Lock & End 🔒')
-        .setStyle(ButtonStyle.Secondary);
+        // 🌟 FIX 2: FETCH ALL USERS (BYPASS 100 LIMIT) 🌟
+        let lastId;
+        let fetchedUsers;
+        do {
+          const options = { limit: 100 };
+          if (lastId) options.after = lastId;
+          fetchedUsers = await reaction.users.fetch(options);
+          fetchedUsers.forEach(u => {
+            if (!u.bot && !validUsers.includes(u.id)) validUsers.push(u.id);
+          });
+          lastId = fetchedUsers.size === 100 ? fetchedUsers.last().id : null;
+        } while (lastId);
+        
+        totalEntriesCount = validUsers.length;
+      } else {
+        const data = loadEntries();
+        if (!data[messageId] || data[messageId].length === 0) return interaction.editReply({ content: '🚨 No one has submitted an entry yet!' });
+        
+        totalEntriesCount = data[messageId].length; 
+        
+        const masterCode = data[`secret_${messageId}`] || CORRECT_SECRET_WORD.toLowerCase().replace(/\s+/g, '');
+        const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
+        
+        if (correctEntries.length === 0) {
+          return interaction.editReply({ content: `🚨 Kisine bhi sahi code (**${masterCode.toUpperCase()}**) nahi dala hai!` });
+        }
+        
+        validUsers = correctEntries.map(entry => entry.userId);
+      }
 
-      const endRow = new ActionRowBuilder().addComponents(rerunBtn, lockBtn);
+      validUsers = validUsers.filter(id => !secretWinners.includes(id));
+      const shuffledEntries = validUsers.sort(() => 0.5 - Math.random());
+      const randomSpotsToFill = Math.max(0, winnerCount - secretWinners.length);
+      const randomWinners = shuffledEntries.slice(0, randomSpotsToFill);
+      
+      let finalWinners = [...secretWinners, ...randomWinners].sort(() => 0.5 - Math.random());
+      if (finalWinners.length === 0) return interaction.editReply({ content: '🚨 Not enough valid entries.' });
 
-      await giveawayMessage.edit({ embeds: [resultEmbed], components: [endRow] });
-      await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**! (Correct Code Verified ✅)`);
-    }, 4000);
+      const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
+
+      const oldEmbed = giveawayMessage.embeds[0];
+      const spinEmbed = new EmbedBuilder()
+        .setTitle(`🎰 SPINNING THE WHEEL FOR ${oldEmbed.title}...`)
+        .setImage('https://media.tenor.com/2Xk2v1rP4xgAAAAC/spin-wheel.gif') 
+        .setColor('#ffff00');
+
+      await giveawayMessage.edit({ embeds: [spinEmbed], components: [] });
+
+      setTimeout(async () => {
+        const endedTimestamp = Math.floor(Date.now() / 1000); 
+        
+        const resultEmbed = EmbedBuilder.from(oldEmbed)
+          .setDescription(`**GIVEAWAY ENDED!** 🎉\n\n**Winners:** ${winnerMentions}`)
+          .addFields(
+            { name: 'Total Valid Entries', value: `${validUsers.length + secretWinners.length} / ${totalEntriesCount}`, inline: true }, 
+            { name: 'Ended', value: `<t:${endedTimestamp}:R>`, inline: true }
+          )
+          .setColor('#5865F2')
+          .setImage(null); 
+
+        const rerunBtn = new ButtonBuilder()
+          .setCustomId(spinType) 
+          .setLabel('Re-Roll / Spin Again 🎰')
+          .setStyle(ButtonStyle.Primary);
+          
+        const lockBtn = new ButtonBuilder()
+          .setCustomId('lock_giveaway_final')
+          .setLabel('Lock & End 🔒')
+          .setStyle(ButtonStyle.Secondary);
+
+        const endRow = new ActionRowBuilder().addComponents(rerunBtn, lockBtn);
+
+        await giveawayMessage.edit({ embeds: [resultEmbed], components: [endRow] });
+        await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**! (Correct Code Verified ✅)`);
+        
+        await interaction.editReply({ content: '✅ Spin is complete and winners are drawn!' });
+      }, 4000);
+
+    } catch (err) {
+      console.error(err);
+      return interaction.editReply({ content: '🚨 Ek unexpected error aa gayi. Giveway ko track karne me issue aaya.' });
+    }
   }
 });
 

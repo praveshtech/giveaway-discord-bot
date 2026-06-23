@@ -4,6 +4,7 @@ const path = require('path');
 const { 
   Client, 
   GatewayIntentBits, 
+  Partials, // 🌟 CACHE BYPASS KE LIYE NAYA ADD KIYA HAI
   EmbedBuilder, 
   ActionRowBuilder, 
   ButtonBuilder, 
@@ -20,13 +21,15 @@ const {
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 
+// 🌟 PARTIALS ADD KIYE HAIN PURANE MESSAGES READ KARNE KE LIYE
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent 
-  ]
+  ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction] 
 });
 
 // ==========================================
@@ -585,10 +588,8 @@ client.on('interactionCreate', async (interaction) => {
     let secretWinners = [];
 
     if (spinType === 'spin_giveaway_1') {
-      // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
       secretWinners = ['1089883128300060683', '1001128047128358923']; 
     } else if (spinType === 'spin_giveaway_2') {
-      // 📝 YouTube Word Giveaway (/giveaway2) ke secret winners yahan daalein (Jaise: ['ID3', 'ID4'])
       secretWinners = []; 
     }
     // 👆 ===================================== 👆
@@ -600,9 +601,21 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 
       if (spinType === 'spin_giveaway_1') {
-        // 🌟 FIX 1: EMOJI UNICODE BYPASS 🌟
-        const reaction = giveawayMessage.reactions.cache.find(r => r.emoji.name === '🎁' || r.emoji.name.includes('🎁'));
-        if (!reaction) return interaction.editReply({ content: '🚨 No entries yet on the message!' });
+        
+        // 🌟 FIX 1: SMART EMOJI FINDER & HIGHEST COUNT FALLBACK 🌟
+        let reaction = giveawayMessage.reactions.cache.get('🎁');
+        
+        // Agar normal emoji match nahi hua toh naam se dhundo
+        if (!reaction) {
+          reaction = giveawayMessage.reactions.cache.find(r => r.emoji.name === '🎁' || (r.emoji.name && r.emoji.name.includes('🎁')));
+        }
+        
+        // Agar Discord ne cache clear maar diya, toh sabse zyada count wala (jo pakka main emoji hoga) usko utha lo
+        if (!reaction && giveawayMessage.reactions.cache.size > 0) {
+          reaction = giveawayMessage.reactions.cache.sort((a, b) => b.count - a.count).first();
+        }
+
+        if (!reaction) return interaction.editReply({ content: '🚨 No entries yet on the message! (Discord API Cache Issue)' });
         
         // 🌟 FIX 2: FETCH ALL USERS (BYPASS 100 LIMIT) 🌟
         let lastId;

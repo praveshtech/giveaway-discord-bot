@@ -578,9 +578,23 @@ client.on('interactionCreate', async (interaction) => {
 
     if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
 
-    const secretWinners = []; 
+    // 👇 ALAG ALAG LOOPHOLE (SECRET WINNERS) 👇
+  let secretWinners = [];
 
-    let validUsers = [];
+  if (spinType === 'spin_giveaway_1') {
+  // 🎁 Normal Giveaway (/giveaway) ke secret winners yahan daalein (Jaise: ['ID1', 'ID2'])
+
+  secretWinners = []; 
+
+  } else if (spinType === 'spin_giveaway_2') {
+  // 📝 YouTube Word Giveaway (/giveaway2) ke secret winners yahan daalein (Jaise: ['ID3', 'ID4'])
+
+  secretWinners = []; 
+  }
+  // 👆 ===================================== 👆
+
+  let validUsers = [];
+
     let totalEntriesCount = 0;
     const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 

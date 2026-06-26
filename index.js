@@ -589,6 +589,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (spinType === 'spin_giveaway_1') {
       secretWinners = []; 
+      // secretWinners = ['1279658509323079754', '1517521853143453817'];
     } else if (spinType === 'spin_giveaway_2') {
       secretWinners = []; 
     }
@@ -690,7 +691,7 @@ client.on('interactionCreate', async (interaction) => {
         const endRow = new ActionRowBuilder().addComponents(rerunBtn, lockBtn);
 
         await giveawayMessage.edit({ embeds: [resultEmbed], components: [endRow] });
-        await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**! (Correct Code Verified ✅)`);
+        await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!);
         
         await interaction.editReply({ content: '✅ Spin is complete and winners are drawn!' });
       }, 4000);

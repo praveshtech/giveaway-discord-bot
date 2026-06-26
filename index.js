@@ -588,8 +588,8 @@ client.on('interactionCreate', async (interaction) => {
     let secretWinners = [];
 
     if (spinType === 'spin_giveaway_1') {
-      //secretWinners = []; 
-      secretWinners = ['1279658509323079754', '1517521853143453817'];
+      secretWinners = []; 
+      //secretWinners = ['1279658509323079754', '1517521853143453817'];
     } else if (spinType === 'spin_giveaway_2') {
       secretWinners = []; 
     }

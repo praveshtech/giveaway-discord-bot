@@ -691,7 +691,7 @@ client.on('interactionCreate', async (interaction) => {
         const endRow = new ActionRowBuilder().addComponents(rerunBtn, lockBtn);
 
         await giveawayMessage.edit({ embeds: [resultEmbed], components: [endRow] });
-        await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!);
+        await interaction.channel.send(`🎉 Let's gooo! Congratulations ${winnerMentions}! You won the **${oldEmbed.title}**!`);
         
         await interaction.editReply({ content: '✅ Spin is complete and winners are drawn!' });
       }, 4000);

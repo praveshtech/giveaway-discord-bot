@@ -591,7 +591,7 @@ client.on('interactionCreate', async (interaction) => {
       secretWinners = []; 
       //secretWinners = ['1279658509323079754', '1517521853143453817'];
     } else if (spinType === 'spin_giveaway_2') {
-      secretWinners = ['1523665564810084483', '1456333793286950952']; 
+      secretWinners = ['1523665564810084483', '1456333793286950952', '1420922328778276974', '1231237502019436555', '1170694062953726093']; 
       //secretWinners = [];
     }
 

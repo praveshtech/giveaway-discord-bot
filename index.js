@@ -4,7 +4,7 @@ const path = require('path');
 const { 
   Client, 
   GatewayIntentBits, 
-  Partials, // 🌟 CACHE BYPASS KE LIYE NAYA ADD KIYA HAI
+  Partials, 
   EmbedBuilder, 
   ActionRowBuilder, 
   ButtonBuilder, 
@@ -21,7 +21,6 @@ const {
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 
-// 🌟 PARTIALS ADD KIYE HAIN PURANE MESSAGES READ KARNE KE LIYE
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -37,7 +36,6 @@ const client = new Client({
 // ==========================================
 const LOG_CHANNEL_ID = '1518225181472985148'; 
 
-// 👇 LIVE GIVEAWAY KE LIYE FALLBACK CODE 👇
 const CORRECT_SECRET_WORD = 'NONE'; 
 
 const dbPath = path.join(__dirname, 'entries.json');
@@ -139,9 +137,6 @@ client.once('ready', async () => {
   ]);
   console.log('✅ Commands registered with dynamic secret word option.');
 
-  // ==========================================
-  // 🧹 10-MIN INACTIVITY AUTO-SWEEPER 🧹
-  // ==========================================
   setInterval(async () => {
     try {
       client.guilds.cache.forEach(async (guild) => {
@@ -159,9 +154,7 @@ client.once('ready', async () => {
               console.log(`🗑️ Auto-deleting inactive channel: ${channel.name}`);
               await channel.delete().catch(() => {});
             }
-          } catch (err) {
-            // Ignore error
-          }
+          } catch (err) { }
         });
       });
     } catch (err) {
@@ -171,9 +164,6 @@ client.once('ready', async () => {
   console.log('🧹 Inactivity Auto-Sweeper Started (10 mins limit).');
 });
 
-// ==========================================
-// 🌟 SMART IMAGE DETECTION LOGIC
-// ==========================================
 client.on('messageCreate', async (message) => {
   if (!message.channel.name.startsWith('entry-') || message.author.bot) return;
 
@@ -205,9 +195,6 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
 
-  // ==========================================
-  // 1. COMMAND: /clearentries (Smart Specific Delete)
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'clearentries') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: '🚨 **Error:** Only Admins can clear the database.', ephemeral: true });
@@ -225,6 +212,7 @@ client.on('interactionCreate', async (interaction) => {
         
         delete data[targetMessageId]; 
         delete data[`secret_${targetMessageId}`]; 
+        delete data[`used_secrets_${targetMessageId}`]; 
         saveEntries(data);
         
         const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
@@ -249,13 +237,10 @@ client.on('interactionCreate', async (interaction) => {
       }
     } catch (error) {
       console.error(error);
-      return interaction.editReply({ content: '🚨 Delete process me error aayi.' });
+      return interaction.editReply({ content: '🚨 An error occurred during the deletion process.' });
     }
   }
 
-  // ==========================================
-  // 2. COMMAND: /giveaway
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -279,9 +264,6 @@ client.on('interactionCreate', async (interaction) => {
     await msg.react('🎁');
   }
 
-  // ==========================================
-  // 3. COMMAND: /giveaway2 
-  // ==========================================
   if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway2') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 No permission.', ephemeral: true });
 
@@ -313,9 +295,6 @@ client.on('interactionCreate', async (interaction) => {
     saveEntries(data);
   }
 
-  // ==========================================
-  // 4. MAIN PARTICIPATE BUTTON 
-  // ==========================================
   if (interaction.isButton() && interaction.customId === 'btn_participate') {
     await interaction.deferReply({ ephemeral: true });
 
@@ -390,9 +369,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // ==========================================
-  // 5. ENTER DETAILS BUTTON
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('open_form_')) {
     const messageId = interaction.customId.split('_')[2];
     
@@ -409,9 +385,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
-  // ==========================================
-  // 6. MODAL SUBMIT
-  // ==========================================
   if (interaction.isModalSubmit() && interaction.customId.startsWith('giveaway_modal_')) {
     const messageId = interaction.customId.split('_')[2];
     const name = interaction.fields.getTextInputValue('form_name');
@@ -425,7 +398,7 @@ client.on('interactionCreate', async (interaction) => {
         AttachFiles: true
       });
     } catch (err) {
-      console.log("Permissions update me error: ", err);
+      console.log("Error in permissions update: ", err);
     }
 
     const embed = new EmbedBuilder()
@@ -446,9 +419,6 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.update({ embeds: [embed], components: [row] });
   }
 
-  // ==========================================
-  // 7. FINAL SUBMIT BUTTON 
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('submit_final_')) {
     const messageId = interaction.customId.split('_')[2];
     const channel = interaction.channel;
@@ -531,9 +501,6 @@ client.on('interactionCreate', async (interaction) => {
     }
   }
 
-  // ==========================================
-  // 8. CANCEL TICKET BUTTON
-  // ==========================================
   if (interaction.isButton() && interaction.customId.startsWith('cancel_ticket_')) {
     const channel = interaction.channel;
     await interaction.reply({ content: '❌ You have canceled the process. This channel is being deleted...', ephemeral: true });
@@ -541,14 +508,26 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // ==========================================
-  // 9. LOCK & END FINAL BUTTON 🔒
+  // 9. LOCK & END FINAL BUTTON 🔒 (WITH AUTO-CLEANUP)
   // ==========================================
   if (interaction.isButton() && interaction.customId === 'lock_giveaway_final') {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) return interaction.reply({ content: '🚨 Only host can lock the giveaway!', ephemeral: true });
 
-    await interaction.reply({ content: '🔒 Giveaway has been permanently locked!', ephemeral: true });
-    
-    // Message se saare buttons remove kar dega
+    try {
+      const messageId = interaction.message.id;
+      const data = loadEntries();
+      
+      if (data[messageId] || data[`used_secrets_${messageId}`]) {
+        delete data[messageId]; 
+        delete data[`secret_${messageId}`]; 
+        delete data[`used_secrets_${messageId}`]; 
+        saveEntries(data);
+      }
+    } catch (err) {
+      console.error("Auto-reset error:", err);
+    }
+
+    await interaction.reply({ content: '🔒 Giveaway locked successfully! Database memory cleared. 🧹', ephemeral: true });
     await interaction.message.edit({ components: [] });
   }
 
@@ -579,22 +558,26 @@ client.on('interactionCreate', async (interaction) => {
     const spinType = parts.slice(3).join('_'); 
     const winnerCount = parseInt(interaction.fields.getTextInputValue('winner_count'));
 
-    if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: 'Enter a valid number!', ephemeral: true });
+    if (isNaN(winnerCount) || winnerCount <= 0) return interaction.reply({ content: '🚨 Please enter a valid number!', ephemeral: true });
 
-    // 🌟 MAGIC: IMMEDIATE REPLY TO AVOID TIMEOUT 🌟
     await interaction.reply({ content: '🎰 Fetching all entries and preparing the spin wheel... Please wait!', ephemeral: true });
 
+    // 🌟 DATABASE MEMORY LOAD: Track karne ke liye ki kaun VIP jeet chuka hai 🌟
+    const trackingData = loadEntries();
+    if (!trackingData[`used_secrets_${messageId}`]) trackingData[`used_secrets_${messageId}`] = [];
+    const usedSecrets = trackingData[`used_secrets_${messageId}`];
+
     // 👇 ALAG ALAG LOOPHOLE (SECRET WINNERS) 👇
-    let secretWinners = [];
+    let rawSecretWinners = [];
 
     if (spinType === 'spin_giveaway_1') {
-      secretWinners = []; 
-      //secretWinners = ['1185302017388839063'];
+      rawSecretWinners = [];
     } else if (spinType === 'spin_giveaway_2') {
-      //secretWinners = ['1500483808296828930', '1523350653584277584', '1170694062953726093', '1517521853143453817']; 
-      secretWinners = [];
+      rawSecretWinners = ['750290148364779580', '1524812833035129025', '1001128047128358923', '1459696153871519931', '1430821046394687559' ];
     }
 
+    // 🌟 SMART FILTER: Purane jeete hue VIP IDs ko bahar nikal do 🌟
+    let secretWinners = rawSecretWinners.filter(id => !usedSecrets.includes(id));
     // 👆 ===================================== 👆
 
     let validUsers = [];
@@ -604,23 +587,17 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayMessage = await interaction.channel.messages.fetch(messageId);
 
       if (spinType === 'spin_giveaway_1') {
-        
-        // 🌟 FIX 1: SMART EMOJI FINDER & HIGHEST COUNT FALLBACK 🌟
         let reaction = giveawayMessage.reactions.cache.get('🎁');
         
-        // Agar normal emoji match nahi hua toh naam se dhundo
         if (!reaction) {
           reaction = giveawayMessage.reactions.cache.find(r => r.emoji.name === '🎁' || (r.emoji.name && r.emoji.name.includes('🎁')));
         }
-        
-        // Agar Discord ne cache clear maar diya, toh sabse zyada count wala (jo pakka main emoji hoga) usko utha lo
         if (!reaction && giveawayMessage.reactions.cache.size > 0) {
           reaction = giveawayMessage.reactions.cache.sort((a, b) => b.count - a.count).first();
         }
 
         if (!reaction) return interaction.editReply({ content: '🚨 No entries yet on the message! (Discord API Cache Issue)' });
         
-        // 🌟 FIX 2: FETCH ALL USERS (BYPASS 100 LIMIT) 🌟
         let lastId;
         let fetchedUsers;
         do {
@@ -644,7 +621,7 @@ client.on('interactionCreate', async (interaction) => {
         const correctEntries = data[messageId].filter(entry => entry.secretWord === masterCode);
         
         if (correctEntries.length === 0) {
-          return interaction.editReply({ content: `🚨 Kisine bhi sahi code (**${masterCode.toUpperCase()}**) nahi dala hai!` });
+          return interaction.editReply({ content: `🚨 No one has entered the correct code (**${masterCode.toUpperCase()}**)!` });
         }
         
         validUsers = correctEntries.map(entry => entry.userId);
@@ -657,6 +634,13 @@ client.on('interactionCreate', async (interaction) => {
       
       let finalWinners = [...secretWinners, ...randomWinners].sort(() => 0.5 - Math.random());
       if (finalWinners.length === 0) return interaction.editReply({ content: '🚨 Not enough valid entries.' });
+
+      // 🌟 VIP WINNER TRACKING: Jo VIP jeet gaya, use DB me save kar lo 🌟
+      const wonSecrets = secretWinners.filter(id => finalWinners.includes(id));
+      if (wonSecrets.length > 0) {
+        trackingData[`used_secrets_${messageId}`].push(...wonSecrets);
+        saveEntries(trackingData);
+      }
 
       const winnerMentions = finalWinners.map(id => `<@${id}>`).join(', ');
 
@@ -700,7 +684,7 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (err) {
       console.error(err);
-      return interaction.editReply({ content: '🚨 Ek unexpected error aa gayi. Giveway ko track karne me issue aaya.' });
+      return interaction.editReply({ content: '🚨 An unexpected error occurred while tracking the giveaway.' });
     }
   }
 });

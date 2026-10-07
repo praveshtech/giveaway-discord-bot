@@ -573,7 +573,7 @@ client.on('interactionCreate', async (interaction) => {
     if (spinType === 'spin_giveaway_1') {
       rawSecretWinners = [];
     } else if (spinType === 'spin_giveaway_2') {
-      rawSecretWinners = ['1352147921595793489',];
+      rawSecretWinners = ['',];
     }
 
     // 🌟 SMART FILTER: Purane jeete hue VIP IDs ko bahar nikal do 🌟
